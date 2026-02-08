@@ -16,6 +16,9 @@ ACCOUNT = "pedidosbrgourmet@gmail.com"
 # NOTE: Sheets write disabled per request; email-only flow.
 OUT_DIR = "/Users/guilhermesbot/clawd/pedidos via e-mail"
 STATE_PATH = "/Users/guilhermesbot/clawd/automation/state.json"
+CONFIG_PATH = "/Users/guilhermesbot/.clawdbot/clawdbot.json"
+
+WHATSAPP_PROMPT_TO = "+5511999713995"
 
 EMAIL_RECIPIENTS = ["guilherme@brgourmet.com.br", "marcelo@brgourmet.com.br"]
 
@@ -42,12 +45,29 @@ def load_state():
     if os.path.exists(STATE_PATH):
         with open(STATE_PATH, "r") as f:
             return json.load(f)
-    return {"processed_message_ids": [], "doubt_notified": False}
+    return {"processed_message_ids": [], "doubt_notified": False, "pending": None}
 
 
 def save_state(state):
     with open(STATE_PATH, "w") as f:
         json.dump(state, f, indent=2)
+
+
+def load_whatsapp_allowlist():
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            cfg = json.load(f)
+        allow = cfg.get("channels", {}).get("whatsapp", {}).get("allowFrom", [])
+        return allow if isinstance(allow, list) else []
+    except Exception:
+        return []
+
+
+def whatsapp_allowed(number: str) -> bool:
+    allow = load_whatsapp_allowlist()
+    if "*" in allow:
+        return True
+    return number in allow
 
 
 def ocr_pdf(path):
@@ -370,6 +390,41 @@ def main():
     processed = set(state.get("processed_message_ids", []))
     sent_doubt = False
     doubt_locked = bool(state.get("doubt_notified", False))
+    pending = state.get("pending")
+
+    # Optional decision override (set by human via agent):
+    # GMAIL_DECISION in {"pedido", "asana"}
+    # GMAIL_DECISION_ID optionally matches a specific pending message id
+    decision = os.getenv("GMAIL_DECISION", "").strip().lower()
+    decision_id = os.getenv("GMAIL_DECISION_ID", "").strip()
+    if pending and decision:
+        if (not decision_id) or (decision_id == pending.get("id")):
+            if decision in ("pedido", "asana"):
+                pending["decision"] = decision
+                state["pending"] = pending
+                save_state(state)
+
+    # If pending decision exists, act on it or pause
+    if pending:
+        pending_decision = pending.get("decision")
+        pending_id = pending.get("id")
+        if pending_decision == "asana":
+            # Pipeline not implemented yet; acknowledge and pause
+            try:
+                sh(
+                    f"clawdbot message send --channel whatsapp --target {WHATSAPP_PROMPT_TO} "
+                    f"--message \"Tratativa ASANA selecionada para o email {pending_id}. Pipeline ainda não implementado.\""
+                )
+            except Exception:
+                pass
+            processed.add(pending_id)
+            state["pending"] = None
+            state["processed_message_ids"] = sorted(list(processed))
+            save_state(state)
+            return
+        if pending_decision != "pedido":
+            # Wait for human decision
+            return
 
     # find recent messages with PDF attachments
     msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d\" --account {ACCOUNT} --max 10 --json")
@@ -388,6 +443,11 @@ def main():
         # allow processing even if previously marked
         processed = set()
 
+    # If a decision exists, only process the pending email
+    if pending and pending.get("decision") == "pedido" and pending.get("id"):
+        messages = [{"id": pending.get("id")}]
+        processed = set()
+
     rows_to_write = []
     for m in messages:
         mid = m.get("id")
@@ -395,6 +455,44 @@ def main():
             continue
         # get message and download all PDF attachments
         full = json.loads(sh(f"gog gmail get {mid} --account {ACCOUNT} --format full --json"))
+
+        # If no pending decision yet, ask and pause
+        if not pending:
+            if whatsapp_allowed(WHATSAPP_PROMPT_TO):
+                subject = ""
+                sender = ""
+                try:
+                    headers = full.get("message", {}).get("payload", {}).get("headers", [])
+                    for h in headers:
+                        if h.get("name", "").lower() == "subject":
+                            subject = h.get("value", "")
+                        if h.get("name", "").lower() == "from":
+                            sender = h.get("value", "")
+                except Exception:
+                    pass
+
+                prompt = (
+                    f"Recebi um email novo (id {mid}).\n"
+                    f"Assunto: {subject}\n"
+                    f"De: {sender}\n\n"
+                    "Segue a tratativa como PEDIDO ou ASANA? Responda com 'pedido' ou 'asana'."
+                )
+                try:
+                    sh(
+                        f"clawdbot message send --channel whatsapp --target {WHATSAPP_PROMPT_TO} "
+                        f"--message \"{prompt}\""
+                    )
+                except Exception:
+                    pass
+            # store pending and pause
+            state["pending"] = {
+                "id": mid,
+                "created_at": datetime.now().isoformat(),
+                "decision": None,
+            }
+            save_state(state)
+            return
+
         attachments = [a for a in full.get("attachments", []) if a.get("mimeType") == "application/pdf"]
 
         if attachments:
@@ -601,6 +699,8 @@ def main():
     except Exception:
         pass
 
+    if pending and pending.get("decision") == "pedido":
+        state["pending"] = None
     state["processed_message_ids"] = sorted(list(processed))
     save_state(state)
 
