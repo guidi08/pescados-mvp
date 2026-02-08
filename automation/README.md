@@ -1,39 +1,41 @@
-# Automação Gmail → PDF → Planilha
+# Automação 1+2 (Anexos + Triagem)
 
-## O que faz
-- Lê e-mails com PDFs no Gmail `pedidosbrgourmet@gmail.com`
-- Extrai dados do pedido do PDF
-- Escreve na planilha: https://docs.google.com/spreadsheets/d/1tIEWGWLQl1Gy7XVtUPf-7YQ8Sg2tf3kQJJZ4g67PK-A
+## Automação 1 — Coletar anexos do Gmail
+- **Objetivo:** salvar todos os anexos recebidos em `/Users/guilhermesbot/clawd/anexos`
+- **Fonte:** Gmail `pedidosbrgourmet@gmail.com`
+- **Script:** `auto_collect.py`
 
-## Requisitos
-- Python 3
-- `pip install gspread google-auth pypdf pytesseract pdf2image`
-- `brew install tesseract poppler tesseract-lang`
-- Chave service account: `/Users/guilhermesbot/clawd/keys/gsheets.json`
-- Gmail autenticado via `gog`
-
-## Como rodar manualmente
+**Rodar manualmente:**
 ```
-python3 /Users/guilhermesbot/clawd/automation/run_pipeline.py
+python3 /Users/guilhermesbot/clawd/automation/auto_collect.py
 ```
 
-## Como rodar automaticamente (LaunchAgent)
+## Automação 2 — Triagem da pasta /anexos
+- **Quando:** toda vez que entrar um arquivo em `/Users/guilhermesbot/clawd/anexos`
+- **Ação:** enviar no WhatsApp **apenas o assunto do e‑mail** + pergunta “pedido ou asana?”
+- **Script:** `auto_triage.py`
+
+**Rodar manualmente:**
 ```
-launchctl load ~/Library/LaunchAgents/com.clawd.gmail-pdf.plist
-launchctl start com.clawd.gmail-pdf
+python3 /Users/guilhermesbot/clawd/automation/auto_triage.py
 ```
 
-## Logs
-- `~/Library/Logs/clawd-gmail-pdf.log`
+## Definir decisão (pedido/asana)
+Quando você responder no WhatsApp, o agente define a decisão e roda o triage novamente:
+```
+python3 /Users/guilhermesbot/clawd/automation/set_triage_decision.py pedido
+python3 /Users/guilhermesbot/clawd/automation/auto_triage.py
+```
 
-## Notificação WhatsApp
-Ao incluir pedidos, envia automaticamente:
-"Foram incluídos X no google sheets"
-para +5511999713995 e +5511971514265.
+## Arquivamento
+- **Pedido:** move para `/Users/guilhermesbot/clawd/anexos/pedidos_arquivados`
+- **Asana:** move para `/Users/guilhermesbot/clawd/anexos/Asana_(MÊS-ANO)`
 
-## Migração para Mac Mini
-Copie a pasta `/Users/guilhermesbot/clawd/automation` e as chaves:
-- `/Users/guilhermesbot/clawd/keys/gsheets.json`
-- `~/.config/gog/` (ou o diretório onde o `gog` salva as credenciais)
+## Pipeline de pedido (PDF)
+O processamento de **pedido** usa o `run_pipeline.py` e gera:
+- XLSX
+- Totais por item via WhatsApp
 
-Depois instale dependências e ative o LaunchAgent.
+## Observação importante (Asana)
+O resumo “asana” precisa do mapeamento dos campos (delivery/salão/pagamentos/entradas/vouchers).
+Assim que você confirmar o layout do arquivo, eu implemento o resumo.

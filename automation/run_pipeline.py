@@ -18,6 +18,9 @@ OUT_DIR = "/Users/guilhermesbot/clawd/pedidos via e-mail"
 STATE_PATH = "/Users/guilhermesbot/clawd/automation/state.json"
 CONFIG_PATH = "/Users/guilhermesbot/.clawdbot/clawdbot.json"
 
+ATTACH_PATH = os.getenv("ATTACH_PATH", "").strip()
+ATTACH_SUBJECT = os.getenv("ATTACH_SUBJECT", "").strip()
+
 WHATSAPP_PROMPT_TO = "+5511999713995"
 
 EMAIL_RECIPIENTS = ["guilherme@brgourmet.com.br", "marcelo@brgourmet.com.br"]
@@ -386,6 +389,163 @@ def parse_pdf(path):
 
 
 def main():
+    # If ATTACH_PATH is provided, process a single local file as a pedido
+    if ATTACH_PATH:
+        try:
+            parsed = []
+            ext = os.path.splitext(ATTACH_PATH)[1].lower()
+            if ext == ".pdf":
+                parsed = parse_pdf(ATTACH_PATH)
+            else:
+                # unsupported for parsing
+                parsed = []
+
+            if not parsed:
+                try:
+                    sh(
+                        f"clawdbot message send --channel whatsapp --target +5511999713995 "
+                        f"--message \"Não consegui extrair itens do arquivo {os.path.basename(ATTACH_PATH)}.\""
+                    )
+                except Exception:
+                    pass
+                return
+
+            rows_to_write = parsed
+
+            # Build XLSX with the same data (no Sheets write)
+            try:
+                import xlsxwriter
+            except Exception:
+                raise RuntimeError("xlsxwriter not installed. Run: python3 -m pip install xlsxwriter")
+
+            tmp_dir = "/Users/guilhermesbot/clawd/tmp"
+            os.makedirs(tmp_dir, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d")
+
+            def infer_rede(rows):
+                names = set()
+                for r in rows:
+                    f = (r.get("filial") or "").upper()
+                    if "MAMBO" in f: names.add("MAMBO")
+                    if "SONDA" in f: names.add("SONDA")
+                    if "MOMO" in f: names.add("MOMO")
+                if len(names) == 1:
+                    return list(names)[0]
+                if len(names) == 0:
+                    return "PEDIDOS"
+                return "MISTO"
+
+            rede = infer_rede(rows_to_write)
+            xlsx_path = os.path.join(tmp_dir, f"{rede}_{ts}.xlsx")
+
+            workbook = xlsxwriter.Workbook(xlsx_path)
+            ws = workbook.add_worksheet("Pedidos")
+            headers = [
+                "PEDIDO",
+                "CLIENTE/CNPJ",
+                "PRODUTO",
+                "CODIGO",
+                "QUANTIDADE",
+                "VALOR",
+                "VR TOTAL",
+                "OBSERVAÇÕES",
+                "CONTATO",
+            ]
+            for c, h in enumerate(headers):
+                ws.write(0, c, h)
+
+            def to_float(s):
+                if s is None:
+                    return None
+                if isinstance(s, (int, float)):
+                    return float(s)
+                s = str(s).strip()
+                if not s:
+                    return None
+                s = s.replace('.', '').replace(',', '.')
+                try:
+                    return float(s)
+                except Exception:
+                    return None
+
+            def fmt_comma(n):
+                if n is None or n == "":
+                    return ""
+                try:
+                    return f"{float(n):,.3f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                except Exception:
+                    return str(n)
+
+            formats = [workbook.add_format({"bg_color": c}) for c in PASTEL_COLORS]
+            color_idx = 0
+            last_filial = None
+
+            row = 1
+            for r in rows_to_write:
+                qty_f = to_float(r["qty"])
+                price_f = to_float(r["price"])
+                total = qty_f * price_f if (qty_f is not None and price_f is not None) else None
+
+                filial = r["filial"] or "SONDA"
+                if last_filial is None or filial != last_filial:
+                    color_idx = (color_idx + 1) % len(formats)
+                    last_filial = filial
+                fmt = formats[color_idx]
+
+                ws.write(row, 0, "", fmt)
+                ws.write(row, 1, filial, fmt)
+                ws.write(row, 2, r["product"], fmt)
+                ws.write(row, 3, r["code"], fmt)
+                ws.write(row, 4, fmt_comma(qty_f) if qty_f is not None else r["qty"], fmt)
+                ws.write(row, 5, fmt_comma(price_f) if price_f is not None else r["price"], fmt)
+                ws.write(row, 6, fmt_comma(total), fmt)
+                ws.write(row, 7, r["order"], fmt)
+                ws.write(row, 8, "", fmt)
+                row += 1
+            workbook.close()
+
+            # WhatsApp: send XLSX + totals by item
+            try:
+                sh(f"clawdbot message send --channel whatsapp --target +5511999713995 --media \"{xlsx_path}\" --message \"Arquivo XLSX do pedido\"")
+
+                def qty_to_float(q):
+                    if q is None:
+                        return None
+                    if isinstance(q, (int, float)):
+                        return float(q)
+                    s = str(q)
+                    m = re.search(r"\d+[\.,]?\d*", s)
+                    if not m:
+                        return None
+                    return to_float(m.group(0))
+
+                totals = {}
+                for r in rows_to_write:
+                    qty = qty_to_float(r["qty"])
+                    if qty is None:
+                        continue
+                    name = normalize_product(r["product"])
+                    totals[name] = totals.get(name, 0) + qty
+
+                if totals:
+                    lines = ["Totais por item:"]
+                    grand_total = 0
+                    for name, total in sorted(totals.items()):
+                        lines.append(f"{name} - {fmt_comma(total)}")
+                        try:
+                            grand_total += float(total)
+                        except Exception:
+                            pass
+                    lines.append(f"TOTAL GERAL - {fmt_comma(grand_total)}")
+                    msg = "\n".join(lines)
+                    sh(f"clawdbot message send --channel whatsapp --target +5511999713995 --message \"{msg}\"")
+            except Exception:
+                pass
+
+        except Exception:
+            pass
+        return
+
     state = load_state()
     processed = set(state.get("processed_message_ids", []))
     sent_doubt = False
