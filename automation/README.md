@@ -36,6 +36,8 @@ O processamento de **pedido** usa o `run_pipeline.py` e gera:
 - XLSX
 - Totais por item via WhatsApp
 
+**Atual:** todo e‑mail recebido em `pedidosbrgourmet@gmail.com` é tratado automaticamente como **PEDIDO** (sem pergunta de triagem).
+
 ## Observação importante (Asana)
 O resumo “asana” precisa do mapeamento dos campos (delivery/salão/pagamentos/entradas/vouchers).
 Assim que você confirmar o layout do arquivo, eu implemento o resumo.
