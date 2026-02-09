@@ -120,7 +120,8 @@ def normalize_product(name: str) -> str:
     if not name:
         return ""
     n = name.upper()
-    if "SALM" in n:
+    n = re.sub(r"^ARECEBER\s+", "", n)
+    if "SALM" in n or "ALMAO" in n:
         return "SALMAO"
     if "MERL" in n:
         return "MERLUZA"
@@ -172,6 +173,7 @@ def parse_text_order(text):
             block,
             re.S,
         )
+        main_code = None
         if m_main:
             prod_desc = normalize_product(m_main.group(2).strip())
             qty = m_main.group(3)
@@ -182,6 +184,34 @@ def parse_text_order(text):
             unit_str = f"{unit:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
             code = "4103" if ("ALMAO" in prod_desc or "SALM" in prod_desc) else m_main.group(1)
+            main_code = m_main.group(1)
+
+            m_rows.append({
+                "filial": f"MAMBO Empresa {empresa} {nome}",
+                "product": prod_desc or "",
+                "code": code or "",
+                "qty": qty or "",
+                "price": unit_str or "",
+                "order": pedido or "",
+            })
+
+        # additional KG items (e.g., SALMAO lines without 'Areceber')
+        for m_kg in re.finditer(
+            r"(\d{5,6})\s*([A-Z].*?)\s+KG\s+1,000\s+([\d.,]+)\s+([\d.,]+)",
+            block,
+            re.S,
+        ):
+            item_code = m_kg.group(1)
+            if main_code and item_code == main_code:
+                continue
+            prod_desc = normalize_product(m_kg.group(2).strip())
+            qty = m_kg.group(3)
+            total = m_kg.group(4)
+            qty_f = to_float(qty)
+            total_f = to_float(total)
+            unit = total_f / qty_f if qty_f else 0
+            unit_str = f"{unit:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            code = "4103" if ("ALMAO" in prod_desc or "SALM" in prod_desc) else item_code
 
             m_rows.append({
                 "filial": f"MAMBO Empresa {empresa} {nome}",
