@@ -36,4 +36,5 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 Add whatever helps you do your job. This is your cheat sheet.
 
 ## Automation Review Rule
-- Sempre que o usuário perguntar sobre “automation”, abrir e revisar a pasta `/Users/guilhermesbot/clawd/automation` antes de responder.
+- Sempre que o usuário perguntar sobre “automation” **na sessão principal** (mensagem humana explícita), abrir e revisar a pasta `/Users/guilhermesbot/clawd/automation` antes de responder.
+- **Não** aplicar essa regra a hooks/sistema/exec prompts (ex.: GmailPipeline).
