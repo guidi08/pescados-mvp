@@ -9,6 +9,8 @@
 
 ## Preferences
 - Language: Portuguese (user messages in PT-BR).
+- User prefers research summaries sent via WhatsApp to +5511999713995.
+- Prefers direct execution of tasks without many confirmation questions; wants tasks solved even if they require authorization/risk when necessary.
 
 ## Projects / Systems
 - Automation: there is (or should be) a flow where messages stop after an email is received; user wants it configured.

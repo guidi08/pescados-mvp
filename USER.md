@@ -6,7 +6,7 @@
 - **What to call them:** 
 - **Pronouns:** *(optional)*
 - **Timezone:** 
-- **Notes:** 
+- **Notes:** Prefere execução direta das tarefas, sem muitas perguntas de confirmação prévias; quer que a tarefa seja resolvida mesmo se exigir autorização/risco (desde que seja necessário).
 
 ## Context
 
