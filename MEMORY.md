@@ -17,4 +17,4 @@
 - Automation: there is (or should be) a flow where messages stop after an email is received; user wants it configured.
 
 ## Notes
-- None.
+- Public reports (examples): users describe Clawdbot handling reminders/calendar holds, message follow‑ups, daily schedule summaries, group chat summarization, and monitoring/price alerts (e.g., Brandon Wang blog, Feb 2026). Some public articles emphasize security risks with exposed gateways; treat source quality cautiously.
