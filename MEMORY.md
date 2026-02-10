@@ -3,6 +3,7 @@
 ## Summary
 - 2025-09-13: User asked to create memory file; assistant created `MEMORY.md`.
 - 2025-09-13: User reported that messages should have stopped automatically after receiving an email and asked how to configure that behavior.
+- User profile (confirmed by user): empreendedor altamente operacional, orientado a dados, com visão global; transita entre negócios tradicionais e tecnologia avançada; usa IA como infraestrutura para escalar operações e buscar liberdade patrimonial; foco explícito em valuation, não em apego.
 
 ## People
 - User: name not provided yet.
