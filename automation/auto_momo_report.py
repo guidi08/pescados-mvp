@@ -26,7 +26,7 @@ def load_state():
     if os.path.exists(STATE_PATH):
         with open(STATE_PATH, "r") as f:
             return json.load(f)
-    return {"processed_message_ids": [], "last_vouchers_total": 37463.92}
+    return {"processed_message_ids": [], "last_vouchers_total": 37463.92, "flow_base": 103590.15}
 
 
 def save_state(state):
@@ -68,6 +68,29 @@ def parse_export(path):
 
     if len(df) == 1:
         row = df.iloc[0]
+
+        pag_leop = row.get("total_pagamentos")
+        pag_pin = 0
+        # try to read payments split from sheet "1 dias"
+        try:
+            from openpyxl import load_workbook
+            wb = load_workbook(path, data_only=True)
+            if "1 dias" in wb.sheetnames:
+                ws = wb["1 dias"]
+                for r in range(1, ws.max_row + 1):
+                    label = ws.cell(r, 1).value
+                    if label == "Total pagamentos Leopoldina(R$)":
+                        val = ws.cell(r, 2).value
+                        if val is not None:
+                            pag_leop = val
+                    if label == "Total pagamentos Pinheiros(R$)":
+                        val = ws.cell(r, 2).value
+                        if val is not None:
+                            pag_pin = val
+            wb.close()
+        except Exception:
+            pass
+
         return {
             "is_multi": False,
             "date": to_date(row.get("data_movimento")),
@@ -80,6 +103,8 @@ def parse_export(path):
             "delivery_pin_total_qtd": row.get("delivery_pin_total_qtd"),
             "rod_total_dia": row.get("rod_total_dia"),
             "vouchers_total": row.get("vouchers_total"),
+            "pag_leop": pag_leop,
+            "pag_pin": pag_pin,
         }
 
     # multi-day (weekend) -> sum totals, keep last voucher as current
@@ -104,11 +129,16 @@ def parse_export(path):
         "delivery_pin_total_qtd": col_sum("delivery_pin_total_qtd"),
         "rod_total_dia": col_sum("rod_total_dia"),
         "vouchers_total": vouchers_total,
+        "pag_leop": total_pagamentos,
+        "pag_pin": 0,
     }
 
 
-def summarize(data, last_vouchers_total):
+def summarize(data, last_vouchers_total, flow_base):
     if data.get("is_multi"):
+        # for multi-day reports, do not show detailed per-unit payments
+        data["pag_leop"] = data.get("total_pagamentos")
+        data["pag_pin"] = 0
         start = data.get("start_date")
         end = data.get("end_date")
         if hasattr(start, "strftime") and hasattr(end, "strftime"):
@@ -139,6 +169,17 @@ def summarize(data, last_vouchers_total):
     else:
         fluxo_gerado = None
 
+    # Fluxo de caixa: base + voucher
+    if vouchers_total is not None and flow_base is not None:
+        fluxo_inicio = float(vouchers_total) + float(flow_base)
+    else:
+        fluxo_inicio = None
+
+    if fluxo_gerado is not None and fluxo_inicio is not None:
+        fluxo_pos_pagamentos = float(fluxo_inicio) + float(fluxo_gerado)
+    else:
+        fluxo_pos_pagamentos = None
+
     total_pedidos = (data.get("delivery_leop_total_qtd") or 0) + (data.get("delivery_pin_total_qtd") or 0)
 
     total_vendas = None
@@ -154,11 +195,15 @@ def summarize(data, last_vouchers_total):
         f"• Rodízios vendidos: {fmt_int(data.get('rod_total_dia'))}",
         f"• Pedidos total: {fmt_int(total_pedidos)} (Leo: {fmt_int(data.get('delivery_leop_total_qtd'))} | Pin: {fmt_int(data.get('delivery_pin_total_qtd'))})",
         f"• Entrada financeira no dia: {fmt_money(total_entradas)}",
+        f"• Pagamentos Leopoldina: {fmt_money(data.get('pag_leop'))}",
+        f"• Pagamentos Pinheiros: {fmt_money(data.get('pag_pin'))}",
         f"• Pagamentos (saídas) no dia: {fmt_money(total_pagamentos)}",
         f"• Voucher total: {fmt_money(vouchers_total)}",
         f"• Entrada no voucher (Δ): {fmt_money(voucher_delta)}",
         f"• Δ voucher + entrada: {fmt_money(soma_voucher_entradas)}",
         f"• Fluxo gerado no dia: {fmt_money(fluxo_gerado)}",
+        f"• Fluxo de caixa no início do dia: {fmt_money(fluxo_inicio)}",
+        f"• Fluxo de caixa após pagamentos do dia: {fmt_money(fluxo_pos_pagamentos)}",
     ]
     return "\n".join(lines)
 
@@ -167,6 +212,7 @@ def main():
     state = load_state()
     processed = set(state.get("processed_message_ids", []))
     last_vouchers_total = state.get("last_vouchers_total", 37463.92)
+    flow_base = state.get("flow_base", 103590.15)
 
     msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d has:attachment\" --account {ACCOUNT} --max 25 --json")
     msg = json.loads(msg_json)
@@ -203,8 +249,23 @@ def main():
 
             data = parse_export(out_path)
             if data:
-                msg_text = summarize(data, last_vouchers_total)
+                prev_vouchers_total = last_vouchers_total
+                msg_text = summarize(data, last_vouchers_total, flow_base)
                 sh(f"clawdbot message send --channel whatsapp --target {WHATSAPP_TO} --message \"{msg_text}\"")
+
+                # update flow base for next day: flow_base + fluxo_gerado
+                try:
+                    vouchers_total = data.get("vouchers_total")
+                    total_entradas = data.get("total_entradas")
+                    total_pagamentos = data.get("total_pagamentos")
+                    if vouchers_total is not None and total_entradas is not None and total_pagamentos is not None:
+                        voucher_delta = float(vouchers_total) - float(prev_vouchers_total)
+                        soma_voucher_entradas = float(voucher_delta) + float(total_entradas)
+                        fluxo_gerado = float(soma_voucher_entradas) - float(total_pagamentos)
+                        flow_base = float(flow_base) + float(fluxo_gerado)
+                except Exception:
+                    pass
+
                 # update last vouchers total for next report
                 if data.get("vouchers_total") is not None:
                     last_vouchers_total = float(data.get("vouchers_total"))
@@ -216,6 +277,7 @@ def main():
 
     state["processed_message_ids"] = sorted(list(processed))
     state["last_vouchers_total"] = last_vouchers_total
+    state["flow_base"] = flow_base
     save_state(state)
 
 
