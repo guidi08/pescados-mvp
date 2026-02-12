@@ -57,32 +57,69 @@ def parse_export(path):
     df = df.dropna(how="all")
     if df.empty:
         return None
-    row = df.iloc[0]
-    date = row.get("data_movimento")
-    if pd.notna(date):
+
+    def to_date(val):
+        if pd.isna(val):
+            return None
         try:
-            date = pd.to_datetime(date, unit="D", origin="1899-12-30").date()
+            return pd.to_datetime(val, unit="D", origin="1899-12-30").date()
         except Exception:
-            pass
+            return val
+
+    if len(df) == 1:
+        row = df.iloc[0]
+        return {
+            "is_multi": False,
+            "date": to_date(row.get("data_movimento")),
+            "total_entradas": row.get("total_entradas"),
+            "total_pagamentos": row.get("total_pagamentos"),
+            "salao_total": row.get("salao_total"),
+            "delivery_leop_total_valor": row.get("delivery_leop_total_valor"),
+            "delivery_leop_total_qtd": row.get("delivery_leop_total_qtd"),
+            "delivery_pin_total_valor": row.get("delivery_pin_total_valor"),
+            "delivery_pin_total_qtd": row.get("delivery_pin_total_qtd"),
+            "rod_total_dia": row.get("rod_total_dia"),
+            "vouchers_total": row.get("vouchers_total"),
+        }
+
+    # multi-day (weekend) -> sum totals, keep last voucher as current
+    start_date = to_date(df.iloc[0].get("data_movimento"))
+    end_date = to_date(df.iloc[-1].get("data_movimento"))
+
+    def col_sum(name):
+        return df[name].sum(skipna=True) if name in df.columns else None
+
+    vouchers_total = df["vouchers_total"].dropna().iloc[-1] if "vouchers_total" in df.columns and not df["vouchers_total"].dropna().empty else None
+
     return {
-        "date": date,
-        "total_entradas": row.get("total_entradas"),
-        "total_pagamentos": row.get("total_pagamentos"),
-        "salao_total": row.get("salao_total"),
-        "delivery_leop_total_valor": row.get("delivery_leop_total_valor"),
-        "delivery_leop_total_qtd": row.get("delivery_leop_total_qtd"),
-        "delivery_pin_total_valor": row.get("delivery_pin_total_valor"),
-        "delivery_pin_total_qtd": row.get("delivery_pin_total_qtd"),
-        "rod_total_dia": row.get("rod_total_dia"),
-        "vouchers_total": row.get("vouchers_total"),
+        "is_multi": True,
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_entradas": col_sum("total_entradas"),
+        "total_pagamentos": col_sum("total_pagamentos"),
+        "salao_total": col_sum("salao_total"),
+        "delivery_leop_total_valor": col_sum("delivery_leop_total_valor"),
+        "delivery_leop_total_qtd": col_sum("delivery_leop_total_qtd"),
+        "delivery_pin_total_valor": col_sum("delivery_pin_total_valor"),
+        "delivery_pin_total_qtd": col_sum("delivery_pin_total_qtd"),
+        "rod_total_dia": col_sum("rod_total_dia"),
+        "vouchers_total": vouchers_total,
     }
 
 
 def summarize(data, last_vouchers_total):
-    date = data.get("date")
-    if isinstance(date, datetime):
-        date = date.date()
-    date_str = date.strftime("%d/%m/%Y") if hasattr(date, "strftime") else str(date)
+    if data.get("is_multi"):
+        start = data.get("start_date")
+        end = data.get("end_date")
+        if hasattr(start, "strftime") and hasattr(end, "strftime"):
+            date_str = f"Fim de semana {start.strftime('%d/%m')}–{end.strftime('%d/%m/%Y')}"
+        else:
+            date_str = "Fim de semana"
+    else:
+        date = data.get("date")
+        if isinstance(date, datetime):
+            date = date.date()
+        date_str = date.strftime("%d/%m/%Y") if hasattr(date, "strftime") else str(date)
 
     vouchers_total = data.get("vouchers_total")
     if vouchers_total is not None and last_vouchers_total is not None:
@@ -95,6 +132,12 @@ def summarize(data, last_vouchers_total):
         soma_voucher_entradas = float(voucher_delta) + float(total_entradas)
     else:
         soma_voucher_entradas = None
+
+    total_pagamentos = data.get("total_pagamentos")
+    if total_pagamentos is not None and soma_voucher_entradas is not None:
+        fluxo_gerado = float(soma_voucher_entradas) - float(total_pagamentos)
+    else:
+        fluxo_gerado = None
 
     total_pedidos = (data.get("delivery_leop_total_qtd") or 0) + (data.get("delivery_pin_total_qtd") or 0)
 
@@ -111,10 +154,11 @@ def summarize(data, last_vouchers_total):
         f"• Rodízios vendidos: {fmt_int(data.get('rod_total_dia'))}",
         f"• Pedidos total: {fmt_int(total_pedidos)} (Leo: {fmt_int(data.get('delivery_leop_total_qtd'))} | Pin: {fmt_int(data.get('delivery_pin_total_qtd'))})",
         f"• Entrada financeira no dia: {fmt_money(total_entradas)}",
-        f"• Pagamentos (saídas) no dia: {fmt_money(data.get('total_pagamentos'))}",
+        f"• Pagamentos (saídas) no dia: {fmt_money(total_pagamentos)}",
         f"• Voucher total: {fmt_money(vouchers_total)}",
         f"• Entrada no voucher (Δ): {fmt_money(voucher_delta)}",
         f"• Δ voucher + entrada: {fmt_money(soma_voucher_entradas)}",
+        f"• Fluxo gerado no dia: {fmt_money(fluxo_gerado)}",
     ]
     return "\n".join(lines)
 
