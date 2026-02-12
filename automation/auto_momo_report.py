@@ -26,7 +26,7 @@ def load_state():
     if os.path.exists(STATE_PATH):
         with open(STATE_PATH, "r") as f:
             return json.load(f)
-    return {"processed_message_ids": []}
+    return {"processed_message_ids": [], "last_vouchers_total": 37463.92}
 
 
 def save_state(state):
@@ -67,30 +67,47 @@ def parse_export(path):
     return {
         "date": date,
         "total_entradas": row.get("total_entradas"),
-        "total_pagamentos": row.get("total_pagamentos"),
         "salao_total": row.get("salao_total"),
-        "delivery_total_valor": row.get("delivery_total_valor"),
-        "delivery_total_qtd": row.get("delivery_total_qtd"),
-        "total_faturamento": row.get("total_faturamento"),
+        "delivery_leop_total_valor": row.get("delivery_leop_total_valor"),
+        "delivery_leop_total_qtd": row.get("delivery_leop_total_qtd"),
+        "delivery_pin_total_valor": row.get("delivery_pin_total_valor"),
+        "delivery_pin_total_qtd": row.get("delivery_pin_total_qtd"),
         "rod_total_dia": row.get("rod_total_dia"),
         "vouchers_total": row.get("vouchers_total"),
     }
 
 
-def summarize(data):
+def summarize(data, last_vouchers_total):
     date = data.get("date")
     if isinstance(date, datetime):
         date = date.date()
     date_str = date.strftime("%d/%m/%Y") if hasattr(date, "strftime") else str(date)
+
+    vouchers_total = data.get("vouchers_total")
+    if vouchers_total is not None and last_vouchers_total is not None:
+        voucher_delta = float(vouchers_total) - float(last_vouchers_total)
+    else:
+        voucher_delta = None
+
+    total_entradas = data.get("total_entradas")
+    if voucher_delta is not None and total_entradas is not None:
+        soma_voucher_entradas = float(voucher_delta) + float(total_entradas)
+    else:
+        soma_voucher_entradas = None
+
+    total_pedidos = (data.get("delivery_leop_total_qtd") or 0) + (data.get("delivery_pin_total_qtd") or 0)
+
     lines = [
         f"Relatório {date_str}",
-        f"• Entradas: {fmt_money(data.get('total_entradas'))}",
-        f"• Pagamentos: {fmt_money(data.get('total_pagamentos'))}",
-        f"• Salão: {fmt_money(data.get('salao_total'))}",
-        f"• Delivery: {fmt_money(data.get('delivery_total_valor'))} | Qtd: {fmt_int(data.get('delivery_total_qtd'))}",
-        f"• Faturamento: {fmt_money(data.get('total_faturamento'))}",
-        f"• Rodízios (qtd): {fmt_int(data.get('rod_total_dia'))}",
-        f"• Vouchers (saldo): {fmt_money(data.get('vouchers_total'))}",
+        f"• Vendas salão (dia anterior): {fmt_money(data.get('salao_total'))}",
+        f"• Delivery Leopoldina: {fmt_money(data.get('delivery_leop_total_valor'))}",
+        f"• Delivery Pinheiros: {fmt_money(data.get('delivery_pin_total_valor'))}",
+        f"• Rodízios vendidos: {fmt_int(data.get('rod_total_dia'))}",
+        f"• Pedidos total: {fmt_int(total_pedidos)} (Leo: {fmt_int(data.get('delivery_leop_total_qtd'))} | Pin: {fmt_int(data.get('delivery_pin_total_qtd'))})",
+        f"• Entrada financeira no dia: {fmt_money(total_entradas)}",
+        f"• Voucher total: {fmt_money(vouchers_total)}",
+        f"• Entrada no voucher (Δ): {fmt_money(voucher_delta)}",
+        f"• Δ voucher + entrada: {fmt_money(soma_voucher_entradas)}",
     ]
     return "\n".join(lines)
 
@@ -98,6 +115,7 @@ def summarize(data):
 def main():
     state = load_state()
     processed = set(state.get("processed_message_ids", []))
+    last_vouchers_total = state.get("last_vouchers_total", 37463.92)
 
     msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d has:attachment\" --account {ACCOUNT} --max 25 --json")
     msg = json.loads(msg_json)
@@ -134,8 +152,11 @@ def main():
 
             data = parse_export(out_path)
             if data:
-                msg_text = summarize(data)
+                msg_text = summarize(data, last_vouchers_total)
                 sh(f"clawdbot message send --channel whatsapp --target {WHATSAPP_TO} --message \"{msg_text}\"")
+                # update last vouchers total for next report
+                if data.get("vouchers_total") is not None:
+                    last_vouchers_total = float(data.get("vouchers_total"))
             else:
                 msg_text = f"Relatório recebido, mas não consegui ler o Export_CSV: {base}\nAssunto: {subject}"
                 sh(f"clawdbot message send --channel whatsapp --target {WHATSAPP_TO} --message \"{msg_text}\"")
@@ -143,6 +164,7 @@ def main():
         processed.add(mid)
 
     state["processed_message_ids"] = sorted(list(processed))
+    state["last_vouchers_total"] = last_vouchers_total
     save_state(state)
 
 
