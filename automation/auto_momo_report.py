@@ -97,11 +97,16 @@ def summarize(data, last_vouchers_total):
 
     total_pedidos = (data.get("delivery_leop_total_qtd") or 0) + (data.get("delivery_pin_total_qtd") or 0)
 
+    total_vendas = None
+    if data.get('salao_total') is not None and data.get('delivery_leop_total_valor') is not None and data.get('delivery_pin_total_valor') is not None:
+        total_vendas = float(data.get('salao_total')) + float(data.get('delivery_leop_total_valor')) + float(data.get('delivery_pin_total_valor'))
+
     lines = [
         f"Relatório {date_str}",
         f"• Vendas salão (dia anterior): {fmt_money(data.get('salao_total'))}",
         f"• Delivery Leopoldina: {fmt_money(data.get('delivery_leop_total_valor'))}",
         f"• Delivery Pinheiros: {fmt_money(data.get('delivery_pin_total_valor'))}",
+        f"• Total vendas (salão + Leo + Pin): {fmt_money(total_vendas)}",
         f"• Rodízios vendidos: {fmt_int(data.get('rod_total_dia'))}",
         f"• Pedidos total: {fmt_int(total_pedidos)} (Leo: {fmt_int(data.get('delivery_leop_total_qtd'))} | Pin: {fmt_int(data.get('delivery_pin_total_qtd'))})",
         f"• Entrada financeira no dia: {fmt_money(total_entradas)}",
