@@ -26,7 +26,7 @@ def load_state():
     if os.path.exists(STATE_PATH):
         with open(STATE_PATH, "r") as f:
             return json.load(f)
-    return {"processed_message_ids": [], "last_vouchers_total": 37463.92, "flow_base": 103590.15}
+    return {"processed_message_ids": [], "last_vouchers_total": 37463.92, "flow_base_leo": 49595.07, "flow_base_pin": 53995.08}
 
 
 def save_state(state):
@@ -134,7 +134,7 @@ def parse_export(path):
     }
 
 
-def summarize(data, last_vouchers_total, flow_base):
+def summarize(data, last_vouchers_total, flow_base_leo, flow_base_pin):
     if data.get("is_multi"):
         # for multi-day reports, do not show detailed per-unit payments
         data["pag_leop"] = data.get("total_pagamentos")
@@ -169,16 +169,26 @@ def summarize(data, last_vouchers_total, flow_base):
     else:
         fluxo_gerado = None
 
-    # Fluxo de caixa: base + voucher
-    if vouchers_total is not None and flow_base is not None:
-        fluxo_inicio = float(vouchers_total) + float(flow_base)
+    # Fluxo de caixa: Leopoldina usa voucher + base; Pinheiros usa apenas base
+    if vouchers_total is not None and flow_base_leo is not None:
+        fluxo_inicio_leo = float(vouchers_total) + float(flow_base_leo)
     else:
-        fluxo_inicio = None
+        fluxo_inicio_leo = None
 
-    if fluxo_gerado is not None and fluxo_inicio is not None:
-        fluxo_pos_pagamentos = float(fluxo_inicio) + float(fluxo_gerado)
+    if flow_base_pin is not None:
+        fluxo_inicio_pin = float(flow_base_pin)
     else:
-        fluxo_pos_pagamentos = None
+        fluxo_inicio_pin = None
+
+    if fluxo_gerado is not None and fluxo_inicio_leo is not None:
+        fluxo_pos_pagamentos_leo = float(fluxo_inicio_leo) + float(fluxo_gerado)
+    else:
+        fluxo_pos_pagamentos_leo = None
+
+    if fluxo_gerado is not None and fluxo_inicio_pin is not None:
+        fluxo_pos_pagamentos_pin = float(fluxo_inicio_pin) + float(fluxo_gerado)
+    else:
+        fluxo_pos_pagamentos_pin = None
 
     total_pedidos = (data.get("delivery_leop_total_qtd") or 0) + (data.get("delivery_pin_total_qtd") or 0)
 
@@ -202,8 +212,10 @@ def summarize(data, last_vouchers_total, flow_base):
         f"• Entrada no voucher (Δ): {fmt_money(voucher_delta)}",
         f"• Δ voucher + entrada: {fmt_money(soma_voucher_entradas)}",
         f"• Fluxo gerado no dia: {fmt_money(fluxo_gerado)}",
-        f"• Fluxo de caixa no início do dia: {fmt_money(fluxo_inicio)}",
-        f"• Fluxo de caixa após pagamentos do dia: {fmt_money(fluxo_pos_pagamentos)}",
+        f"• Fluxo de caixa no início do dia (Leopoldina): {fmt_money(fluxo_inicio_leo)}",
+        f"• Fluxo de caixa após pagamentos (Leopoldina): {fmt_money(fluxo_pos_pagamentos_leo)}",
+        f"• Fluxo de caixa no início do dia (Pinheiros): {fmt_money(fluxo_inicio_pin)}",
+        f"• Fluxo de caixa após pagamentos (Pinheiros): {fmt_money(fluxo_pos_pagamentos_pin)}",
     ]
     return "\n".join(lines)
 
@@ -212,7 +224,8 @@ def main():
     state = load_state()
     processed = set(state.get("processed_message_ids", []))
     last_vouchers_total = state.get("last_vouchers_total", 37463.92)
-    flow_base = state.get("flow_base", 103590.15)
+    flow_base_leo = state.get("flow_base_leo", 49595.07)
+    flow_base_pin = state.get("flow_base_pin", 53995.08)
 
     msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d has:attachment\" --account {ACCOUNT} --max 25 --json")
     msg = json.loads(msg_json)
@@ -250,7 +263,7 @@ def main():
             data = parse_export(out_path)
             if data:
                 prev_vouchers_total = last_vouchers_total
-                msg_text = summarize(data, last_vouchers_total, flow_base)
+                msg_text = summarize(data, last_vouchers_total, flow_base_leo, flow_base_pin)
                 sh(f"clawdbot message send --channel whatsapp --target {WHATSAPP_TO} --message \"{msg_text}\"")
 
                 # update flow base for next day: flow_base + fluxo_gerado
@@ -262,7 +275,8 @@ def main():
                         voucher_delta = float(vouchers_total) - float(prev_vouchers_total)
                         soma_voucher_entradas = float(voucher_delta) + float(total_entradas)
                         fluxo_gerado = float(soma_voucher_entradas) - float(total_pagamentos)
-                        flow_base = float(flow_base) + float(fluxo_gerado)
+                        flow_base_leo = float(flow_base_leo) + float(fluxo_gerado)
+                        flow_base_pin = float(flow_base_pin) + float(fluxo_gerado)
                 except Exception:
                     pass
 
@@ -277,7 +291,8 @@ def main():
 
     state["processed_message_ids"] = sorted(list(processed))
     state["last_vouchers_total"] = last_vouchers_total
-    state["flow_base"] = flow_base
+    state["flow_base_leo"] = flow_base_leo
+    state["flow_base_pin"] = flow_base_pin
     save_state(state)
 
 
