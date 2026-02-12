@@ -71,7 +71,8 @@ def parse_export(path):
 
         pag_leop = row.get("total_pagamentos")
         pag_pin = 0
-        # try to read payments split from sheet "1 dias"
+        entradas_pin = 0
+        # try to read payments + entradas Pinheiros from sheet "1 dias"
         try:
             from openpyxl import load_workbook
             wb = load_workbook(path, data_only=True)
@@ -87,6 +88,10 @@ def parse_export(path):
                         val = ws.cell(r, 2).value
                         if val is not None:
                             pag_pin = val
+                    if isinstance(label, str) and label.lower() in ("keeta pinheiros", "99 pinheiros", "ifood pinheiros"):
+                        val = ws.cell(r, 2).value
+                        if val is not None:
+                            entradas_pin += float(val)
             wb.close()
         except Exception:
             pass
@@ -105,6 +110,7 @@ def parse_export(path):
             "vouchers_total": row.get("vouchers_total"),
             "pag_leop": pag_leop,
             "pag_pin": pag_pin,
+            "entradas_pin": entradas_pin,
         }
 
     # multi-day (weekend) -> sum totals, keep last voucher as current
@@ -164,6 +170,22 @@ def summarize(data, last_vouchers_total, flow_base_leo, flow_base_pin):
         soma_voucher_entradas = None
 
     total_pagamentos = data.get("total_pagamentos")
+    pag_leop = data.get("pag_leop")
+    pag_pin = data.get("pag_pin")
+    entradas_pin = data.get("entradas_pin", 0)
+
+    # fluxo por unidade
+    if soma_voucher_entradas is not None and pag_leop is not None:
+        fluxo_gerado_leo = float(soma_voucher_entradas) - float(pag_leop)
+    else:
+        fluxo_gerado_leo = None
+
+    if entradas_pin is not None and pag_pin is not None:
+        fluxo_gerado_pin = float(entradas_pin) - float(pag_pin)
+    else:
+        fluxo_gerado_pin = None
+
+    # fluxo total (geral)
     if total_pagamentos is not None and soma_voucher_entradas is not None:
         fluxo_gerado = float(soma_voucher_entradas) - float(total_pagamentos)
     else:
@@ -180,13 +202,13 @@ def summarize(data, last_vouchers_total, flow_base_leo, flow_base_pin):
     else:
         fluxo_inicio_pin = None
 
-    if fluxo_gerado is not None and fluxo_inicio_leo is not None:
-        fluxo_pos_pagamentos_leo = float(fluxo_inicio_leo) + float(fluxo_gerado)
+    if fluxo_gerado_leo is not None and fluxo_inicio_leo is not None:
+        fluxo_pos_pagamentos_leo = float(fluxo_inicio_leo) + float(fluxo_gerado_leo)
     else:
         fluxo_pos_pagamentos_leo = None
 
-    if fluxo_gerado is not None and fluxo_inicio_pin is not None:
-        fluxo_pos_pagamentos_pin = float(fluxo_inicio_pin) + float(fluxo_gerado)
+    if fluxo_gerado_pin is not None and fluxo_inicio_pin is not None:
+        fluxo_pos_pagamentos_pin = float(fluxo_inicio_pin) + float(fluxo_gerado_pin)
     else:
         fluxo_pos_pagamentos_pin = None
 
@@ -211,7 +233,8 @@ def summarize(data, last_vouchers_total, flow_base_leo, flow_base_pin):
         f"• Voucher total: {fmt_money(vouchers_total)}",
         f"• Entrada no voucher (Δ): {fmt_money(voucher_delta)}",
         f"• Δ voucher + entrada: {fmt_money(soma_voucher_entradas)}",
-        f"• Fluxo gerado no dia: {fmt_money(fluxo_gerado)}",
+        f"• Fluxo gerado no dia (Leopoldina): {fmt_money(fluxo_gerado_leo)}",
+        f"• Fluxo gerado no dia (Pinheiros): {fmt_money(fluxo_gerado_pin)}",
         f"• Fluxo de caixa no início do dia (Leopoldina): {fmt_money(fluxo_inicio_leo)}",
         f"• Fluxo de caixa após pagamentos (Leopoldina): {fmt_money(fluxo_pos_pagamentos_leo)}",
         f"• Fluxo de caixa no início do dia (Pinheiros): {fmt_money(fluxo_inicio_pin)}",
@@ -270,13 +293,15 @@ def main():
                 try:
                     vouchers_total = data.get("vouchers_total")
                     total_entradas = data.get("total_entradas")
-                    total_pagamentos = data.get("total_pagamentos")
-                    if vouchers_total is not None and total_entradas is not None and total_pagamentos is not None:
+                    if vouchers_total is not None and total_entradas is not None:
                         voucher_delta = float(vouchers_total) - float(prev_vouchers_total)
                         soma_voucher_entradas = float(voucher_delta) + float(total_entradas)
-                        fluxo_gerado = float(soma_voucher_entradas) - float(total_pagamentos)
-                        flow_base_leo = float(flow_base_leo) + float(fluxo_gerado)
-                        flow_base_pin = float(flow_base_pin) + float(fluxo_gerado)
+                        pag_leop = data.get("pag_leop") or 0
+                        pag_pin = data.get("pag_pin") or 0
+                        fluxo_gerado_leo = float(soma_voucher_entradas) - float(pag_leop)
+                        fluxo_gerado_pin = float(data.get("entradas_pin", 0)) - float(pag_pin)
+                        flow_base_leo = float(flow_base_leo) + float(fluxo_gerado_leo)
+                        flow_base_pin = float(flow_base_pin) + float(fluxo_gerado_pin)
                 except Exception:
                     pass
 
