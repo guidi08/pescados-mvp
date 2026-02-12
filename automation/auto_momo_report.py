@@ -67,6 +67,7 @@ def parse_export(path):
     return {
         "date": date,
         "total_entradas": row.get("total_entradas"),
+        "total_pagamentos": row.get("total_pagamentos"),
         "salao_total": row.get("salao_total"),
         "delivery_leop_total_valor": row.get("delivery_leop_total_valor"),
         "delivery_leop_total_qtd": row.get("delivery_leop_total_qtd"),
@@ -110,6 +111,7 @@ def summarize(data, last_vouchers_total):
         f"• Rodízios vendidos: {fmt_int(data.get('rod_total_dia'))}",
         f"• Pedidos total: {fmt_int(total_pedidos)} (Leo: {fmt_int(data.get('delivery_leop_total_qtd'))} | Pin: {fmt_int(data.get('delivery_pin_total_qtd'))})",
         f"• Entrada financeira no dia: {fmt_money(total_entradas)}",
+        f"• Pagamentos (saídas) no dia: {fmt_money(data.get('total_pagamentos'))}",
         f"• Voucher total: {fmt_money(vouchers_total)}",
         f"• Entrada no voucher (Δ): {fmt_money(voucher_delta)}",
         f"• Δ voucher + entrada: {fmt_money(soma_voucher_entradas)}",
