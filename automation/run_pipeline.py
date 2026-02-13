@@ -381,6 +381,7 @@ def parse_text_order(text):
             desc = "SALMAO"
             # map size
             code = ""
+            size = re.search(r"(6\s*/\s*8|8\s*/\s*10|10\s*/\s*12|12\s*/\s*14|14\s*/\s*16|16\s*/\s*18|18\s*/\s*20)", line.replace("//", "/"))
             if size:
                 sz = size.group(1).replace(" ", "")
                 if sz == "6/8": code = "4102"
