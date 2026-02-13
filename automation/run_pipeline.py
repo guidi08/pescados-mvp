@@ -152,6 +152,45 @@ def parse_text_order(text):
     # capture order number if present (SONDA)
     m_order = re.search(r"Número Pedido:\s*(\d+)", text)
     order_no_global = m_order.group(1) if m_order else ""
+
+    # St Marche / Pedidos Bom Peixe table in email body
+    upper = text.upper()
+    if "PEDIDOS BOM PEIXE" in upper and "CNPJ" in upper and "LOJA" in upper:
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        # find date line (dd.mm.yyyy)
+        date_idx = None
+        for i, l in enumerate(lines):
+            if re.search(r"\b\d{2}\.\d{2}\.\d{4}\b", l):
+                date_idx = i
+                break
+        if date_idx is not None:
+            rows = []
+            i = date_idx + 1
+            while i + 5 < len(lines):
+                # stop at signature
+                if lines[i].lower().startswith("ana caroline") or lines[i].lower().startswith("opera"):
+                    break
+                centro = lines[i]
+                loja = lines[i + 1]
+                cnpj = lines[i + 2]
+                pedido = lines[i + 3]
+                produto = lines[i + 4]
+                qty = lines[i + 5]
+                # basic validation: center code like H111/S303 and CNPJ pattern
+                if re.search(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}", cnpj):
+                    rows.append({
+                        "filial": f"{cnpj} {loja}",
+                        "product": normalize_product(produto),
+                        "code": centro,
+                        "qty": qty,
+                        "price": "",
+                        "order": pedido,
+                        "source": "BOM_PEIXE",
+                    })
+                i += 6
+            if rows:
+                return rows
+
     # MAMBO
     m_rows = []
     block_pattern = re.compile(
@@ -706,15 +745,16 @@ def main():
 
     workbook = xlsxwriter.Workbook(xlsx_path)
     ws = workbook.add_worksheet("Pedidos")
+    is_bom_peixe = any(r.get("source") == "BOM_PEIXE" for r in rows_to_write)
     headers = [
         "PEDIDO",
-        "CLIENTE/CNPJ",
+        "CNPJ + LOJA" if is_bom_peixe else "CLIENTE/CNPJ",
         "PRODUTO",
         "CODIGO",
         "QUANTIDADE",
         "VALOR",
         "VR TOTAL",
-        "OBSERVAÇÕES",
+        "PEDIDOS BOM PEIXE" if is_bom_peixe else "OBSERVAÇÕES",
         "CONTATO",
     ]
     for c, h in enumerate(headers):
