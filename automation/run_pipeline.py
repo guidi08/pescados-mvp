@@ -777,7 +777,7 @@ def main():
         subject = f"Pedido recebido - {now}"
         body = "Segue o XLSX em anexo."
         for rcpt in EMAIL_RECIPIENTS:
-            sh(f"gog gmail send --to {rcpt} --subject \"{subject}\" --body \"{body}\" --attach \"{xlsx_path}\"")
+            sh(f"gog gmail send --to {rcpt} --subject \"{subject}\" --body \"{body}\" --attach \"{xlsx_path}\" --account {ACCOUNT} --client {OAUTH_CLIENT}")
     except Exception:
         pass
 
