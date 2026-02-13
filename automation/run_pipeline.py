@@ -13,6 +13,7 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
 
 ACCOUNT = "pedidosbrgourmet@gmail.com"
+OAUTH_CLIENT = "pedidos"
 # NOTE: Sheets write disabled per request; email-only flow.
 # All incoming emails are treated as PEDIDO (auto flow).
 AUTO_DECISION = "pedido"
@@ -590,7 +591,7 @@ def main():
         save_state(state)
 
     # find recent messages with PDF attachments
-    msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d\" --account {ACCOUNT} --max 10 --json")
+    msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d\" --account {ACCOUNT} --client {OAUTH_CLIENT} --max 10 --json")
     msg = json.loads(msg_json)
     messages = msg.get("messages", [])
 
@@ -612,7 +613,7 @@ def main():
         if not mid or mid in processed:
             continue
         # get message and download all PDF attachments
-        full = json.loads(sh(f"gog gmail get {mid} --account {ACCOUNT} --format full --json"))
+        full = json.loads(sh(f"gog gmail get {mid} --account {ACCOUNT} --client {OAUTH_CLIENT} --format full --json"))
 
         attachments = [a for a in full.get("attachments", []) if a.get("mimeType") == "application/pdf"]
 
@@ -621,7 +622,7 @@ def main():
                 filename = att.get("filename")
                 att_id = att.get("attachmentId")
                 out_path = os.path.join(OUT_DIR, filename)
-                sh(f"gog gmail attachment {mid} {att_id} --account {ACCOUNT} --out \"{out_path}\"")
+                sh(f"gog gmail attachment {mid} {att_id} --account {ACCOUNT} --client {OAUTH_CLIENT} --out \"{out_path}\"")
                 parsed = parse_pdf(out_path)
                 if not parsed:
                     try:

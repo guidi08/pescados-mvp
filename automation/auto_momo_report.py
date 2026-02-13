@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 ACCOUNT = "asanamomo1@gmail.com"
+OAUTH_CLIENT = "asana"
 OUT_DIR = "/Users/guilhermesbot/clawd/anexos/momo_reports"
 STATE_PATH = "/Users/guilhermesbot/clawd/automation/auto_momo_report_state.json"
 WHATSAPP_TO = "+5511999713995"
@@ -256,7 +257,7 @@ def main():
     flow_base_leo = state.get("flow_base_leo", 49595.07)
     flow_base_pin = state.get("flow_base_pin", 53995.08)
 
-    msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d has:attachment\" --account {ACCOUNT} --max 25 --json")
+    msg_json = sh(f"gog gmail messages search \"in:inbox newer_than:7d has:attachment\" --account {ACCOUNT} --client {OAUTH_CLIENT} --max 25 --json")
     msg = json.loads(msg_json)
     messages = msg.get("messages", [])
 
@@ -265,7 +266,7 @@ def main():
         if not mid or mid in processed:
             continue
 
-        full = json.loads(sh(f"gog gmail get {mid} --account {ACCOUNT} --json"))
+        full = json.loads(sh(f"gog gmail get {mid} --account {ACCOUNT} --client {OAUTH_CLIENT} --json"))
         attachments = full.get("attachments", [])
         if not attachments:
             processed.add(mid)
@@ -287,7 +288,7 @@ def main():
             out_name = f"{ts}_{mid}_{base}"
             out_path = os.path.join(OUT_DIR, out_name)
 
-            sh(f"gog gmail attachment {mid} {att_id} --account {ACCOUNT} --out \"{out_path}\"")
+            sh(f"gog gmail attachment {mid} {att_id} --account {ACCOUNT} --client {OAUTH_CLIENT} --out \"{out_path}\"")
 
             data = parse_export(out_path)
             if data:
