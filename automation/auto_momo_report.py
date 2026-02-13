@@ -191,9 +191,9 @@ def summarize(data, last_vouchers_total, flow_base_leo, flow_base_pin):
     else:
         fluxo_gerado = None
 
-    # Fluxo de caixa: Leopoldina usa voucher + base; Pinheiros usa apenas base
-    if vouchers_total is not None and flow_base_leo is not None:
-        fluxo_inicio_leo = float(vouchers_total) + float(flow_base_leo)
+    # Fluxo de caixa: Leopoldina usa o fluxo de ontem como saldo inicial de hoje
+    if flow_base_leo is not None:
+        fluxo_inicio_leo = float(flow_base_leo)
     else:
         fluxo_inicio_leo = None
 
@@ -306,8 +306,10 @@ def main():
                         pag_pin = data.get("pag_pin") or 0
                         fluxo_gerado_leo = float(soma_voucher_entradas) - float(pag_leop)
                         fluxo_gerado_pin = float(data.get("entradas_pin", 0)) - float(pag_pin)
-                        flow_base_leo = float(flow_base_leo) + float(fluxo_gerado_leo)
-                        flow_base_pin = float(flow_base_pin) + float(fluxo_gerado_pin)
+                        fluxo_pos_pagamentos_leo = float(flow_base_leo) + float(fluxo_gerado_leo)
+                        fluxo_pos_pagamentos_pin = float(flow_base_pin) + float(fluxo_gerado_pin)
+                        flow_base_leo = float(fluxo_pos_pagamentos_leo)
+                        flow_base_pin = float(fluxo_pos_pagamentos_pin)
                 except Exception:
                     pass
 
