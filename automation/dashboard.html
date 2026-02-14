@@ -8,12 +8,17 @@
     body { font-family: system-ui, -apple-system, sans-serif; margin: 20px; background:#0b0f14; color:#e6edf3; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
     .card { background:#111827; border:1px solid #1f2937; border-radius:12px; padding:14px; }
+    .card.ok { border-color:#14532d; box-shadow: inset 0 0 0 1px #166534; }
+    .card.warn { border-color:#7f1d1d; box-shadow: inset 0 0 0 1px #991b1b; }
     .title { font-weight:600; font-size:16px; margin-bottom:6px; }
-    .meta { font-size:12px; color:#9ca3af; margin-bottom:8px; }
-    pre { white-space: pre-wrap; word-break: break-word; background:#0b0f14; padding:10px; border-radius:8px; border:1px solid #1f2937; color:#d1d5db; }
+    .meta { font-size:12px; color:#9ca3af; margin-bottom:6px; }
+    .row { display:flex; justify-content:space-between; gap:8px; }
+    .label { color:#9ca3af; }
+    .value { color:#e6edf3; font-weight:500; }
+    .status { font-size:12px; padding:3px 8px; border-radius:999px; background:#052e16; color:#86efac; }
+    .status.warn { background:#3f0a0a; color:#fca5a5; }
     .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
     .badge { font-size:12px; padding:4px 8px; border-radius:999px; background:#1f2937; color:#9ca3af; }
-    .logs { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -22,13 +27,8 @@
     <div class="badge" id="last-update">Carregando…</div>
   </div>
 
-  <h2>Status (Leitura fácil)</h2>
+  <h2>Status</h2>
   <div class="grid" id="states"></div>
-
-  <div class="logs">
-    <h2>Logs</h2>
-    <div class="grid" id="logs"></div>
-  </div>
 
   <script>
     const fmtTime = (t) => new Date(t * 1000).toLocaleString();
@@ -42,68 +42,42 @@
       'state.json': 'Estado geral da automação',
     };
 
-    function friendlySummary(item) {
-      const s = item.summary || {};
-      if (item.name === 'auto_collect_state.json') {
-        const count = Array.isArray(s.processed_message_ids) ? s.processed_message_ids.length : null;
-        return count !== null ? `E-mails processados: ${count}` : 'Sem dados recentes.';
+    // friendlySummary removido (leitura fácil focada em status)
+
+    function detectFailure(summary) {
+      if (!summary || typeof summary !== 'object') return null;
+      const keys = ['error', 'errors', 'last_error', 'failure', 'failed'];
+      for (const k of keys) {
+        if (summary[k]) return `${k}: ${summary[k]}`;
       }
-      if (item.name === 'auto_triage_state.json') {
-        const pending = s.pending_files || s.pending || s.queue || null;
-        if (pending !== null) return `Pendências de triagem: ${pending}`;
-        return 'Triagem sem pendências visíveis.';
-      }
-      if (item.name === 'auto_momo_report_state.json') {
-        const vouchers = s.last_vouchers_total;
-        const leo = s.flow_base_leo;
-        const pin = s.flow_base_pin;
-        const parts = [];
-        if (vouchers !== undefined) parts.push(`Últimos vouchers: R$ ${Number(vouchers).toFixed(2)}`);
-        if (leo !== undefined) parts.push(`Saldo base Leo: R$ ${Number(leo).toFixed(2)}`);
-        if (pin !== undefined) parts.push(`Saldo base Pin: R$ ${Number(pin).toFixed(2)}`);
-        return parts.length ? parts.join(' · ') : 'Sem dados recentes.';
-      }
-      if (item.name === 'auto_rep_report_state.json') {
-        return 'Relatório rep: estado disponível (ver JSON bruto abaixo).';
-      }
-      if (item.name === '.telegram_bridge_state.json') {
-        return 'Bridge do Telegram ativo (ver JSON bruto abaixo).';
-      }
-      if (item.name === 'state.json') {
-        return 'Estado geral: ver JSON bruto abaixo.';
-      }
-      return 'Sem resumo amigável.';
+      return null;
     }
 
     function renderStateCard(item) {
       const div = document.createElement('div');
-      div.className = 'card';
       const info = item.info || {};
       const title = friendlyNames[item.name] || item.name;
+      const failure = detectFailure(item.summary);
+      const statusOk = info.exists && !failure;
+      div.className = `card ${statusOk ? 'ok' : 'warn'}`;
+
+      const lastRun = info.exists ? fmtTime(info.mtime) : '—';
+      const lastAttempt = info.exists ? fmtTime(info.mtime) : '—';
+      const failures = failure || (info.exists ? 'Nenhuma' : 'Arquivo não encontrado');
+
       div.innerHTML = `
-        <div class="title">${title}</div>
-        <div class="meta">
-          ${info.exists ? `Atualizado: ${fmtTime(info.mtime)} · ${info.size} bytes` : 'Arquivo não encontrado'}
+        <div class="row">
+          <div class="title">${title}</div>
+          <div class="status ${statusOk ? '' : 'warn'}">${statusOk ? 'OK' : 'ALERTA'}</div>
         </div>
-        <div class="meta">${friendlySummary(item)}</div>
-        <pre>${item.summary ? JSON.stringify(item.summary, null, 2) : 'sem conteúdo'}</pre>
+        <div class="row meta"><span class="label">Última execução</span><span class="value">${lastRun}</span></div>
+        <div class="row meta"><span class="label">Última tentativa</span><span class="value">${lastAttempt}</span></div>
+        <div class="row meta"><span class="label">Falhas</span><span class="value">${failures}</span></div>
       `;
       return div;
     }
 
-    function renderLogCard(item) {
-      const div = document.createElement('div');
-      div.className = 'card';
-      const info = item.info || {};
-      div.innerHTML = `
-        <div class="title">${item.name}</div>
-        <div class="meta">
-          ${info.exists ? `Atualizado: ${fmtTime(info.mtime)} · ${info.size} bytes` : 'Arquivo não encontrado'}
-        </div>
-        <pre>${item.tail || 'sem conteúdo'}</pre>
-      `;
-      return div;
-    }
+    // logs removidos nesta versão simplificada
 
     async function load() {
       const res = await fetch('/status');
@@ -114,9 +88,7 @@
       states.innerHTML = '';
       data.states.forEach(s => states.appendChild(renderStateCard(s)));
 
-      const logs = document.getElementById('logs');
-      logs.innerHTML = '';
-      data.logs.forEach(l => logs.appendChild(renderLogCard(l)));
+      // logs removidos na versão simplificada
     }
 
     load();
