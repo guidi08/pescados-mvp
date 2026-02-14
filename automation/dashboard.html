@@ -22,7 +22,7 @@
     <div class="badge" id="last-update">Carregando…</div>
   </div>
 
-  <h2>Status (state.json)</h2>
+  <h2>Status (Leitura fácil)</h2>
   <div class="grid" id="states"></div>
 
   <div class="logs">
@@ -33,15 +33,59 @@
   <script>
     const fmtTime = (t) => new Date(t * 1000).toLocaleString();
 
+    const friendlyNames = {
+      'auto_collect_state.json': 'Coleta de anexos (Gmail → /anexos)',
+      'auto_triage_state.json': 'Triagem de anexos (pedido/asana)',
+      'auto_momo_report_state.json': 'Relatório Momo (WhatsApp)',
+      'auto_rep_report_state.json': 'Relatório Rep (WhatsApp)',
+      '.telegram_bridge_state.json': 'Bridge Telegram',
+      'state.json': 'Estado geral da automação',
+    };
+
+    function friendlySummary(item) {
+      const s = item.summary || {};
+      if (item.name === 'auto_collect_state.json') {
+        const count = Array.isArray(s.processed_message_ids) ? s.processed_message_ids.length : null;
+        return count !== null ? `E-mails processados: ${count}` : 'Sem dados recentes.';
+      }
+      if (item.name === 'auto_triage_state.json') {
+        const pending = s.pending_files || s.pending || s.queue || null;
+        if (pending !== null) return `Pendências de triagem: ${pending}`;
+        return 'Triagem sem pendências visíveis.';
+      }
+      if (item.name === 'auto_momo_report_state.json') {
+        const vouchers = s.last_vouchers_total;
+        const leo = s.flow_base_leo;
+        const pin = s.flow_base_pin;
+        const parts = [];
+        if (vouchers !== undefined) parts.push(`Últimos vouchers: R$ ${Number(vouchers).toFixed(2)}`);
+        if (leo !== undefined) parts.push(`Saldo base Leo: R$ ${Number(leo).toFixed(2)}`);
+        if (pin !== undefined) parts.push(`Saldo base Pin: R$ ${Number(pin).toFixed(2)}`);
+        return parts.length ? parts.join(' · ') : 'Sem dados recentes.';
+      }
+      if (item.name === 'auto_rep_report_state.json') {
+        return 'Relatório rep: estado disponível (ver JSON bruto abaixo).';
+      }
+      if (item.name === '.telegram_bridge_state.json') {
+        return 'Bridge do Telegram ativo (ver JSON bruto abaixo).';
+      }
+      if (item.name === 'state.json') {
+        return 'Estado geral: ver JSON bruto abaixo.';
+      }
+      return 'Sem resumo amigável.';
+    }
+
     function renderStateCard(item) {
       const div = document.createElement('div');
       div.className = 'card';
       const info = item.info || {};
+      const title = friendlyNames[item.name] || item.name;
       div.innerHTML = `
-        <div class="title">${item.name}</div>
+        <div class="title">${title}</div>
         <div class="meta">
           ${info.exists ? `Atualizado: ${fmtTime(info.mtime)} · ${info.size} bytes` : 'Arquivo não encontrado'}
         </div>
+        <div class="meta">${friendlySummary(item)}</div>
         <pre>${item.summary ? JSON.stringify(item.summary, null, 2) : 'sem conteúdo'}</pre>
       `;
       return div;
