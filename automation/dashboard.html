@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Automation Monitor</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 20px; background:#0b0f14; color:#e6edf3; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .card { background:#111827; border:1px solid #1f2937; border-radius:12px; padding:14px; }
+    .title { font-weight:600; font-size:16px; margin-bottom:6px; }
+    .meta { font-size:12px; color:#9ca3af; margin-bottom:8px; }
+    pre { white-space: pre-wrap; word-break: break-word; background:#0b0f14; padding:10px; border-radius:8px; border:1px solid #1f2937; color:#d1d5db; }
+    .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .badge { font-size:12px; padding:4px 8px; border-radius:999px; background:#1f2937; color:#9ca3af; }
+    .logs { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Automation Monitor</h1>
+    <div class="badge" id="last-update">Carregando…</div>
+  </div>
+
+  <h2>Status (state.json)</h2>
+  <div class="grid" id="states"></div>
+
+  <div class="logs">
+    <h2>Logs</h2>
+    <div class="grid" id="logs"></div>
+  </div>
+
+  <script>
+    const fmtTime = (t) => new Date(t * 1000).toLocaleString();
+
+    function renderStateCard(item) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      const info = item.info || {};
+      div.innerHTML = `
+        <div class="title">${item.name}</div>
+        <div class="meta">
+          ${info.exists ? `Atualizado: ${fmtTime(info.mtime)} · ${info.size} bytes` : 'Arquivo não encontrado'}
+        </div>
+        <pre>${item.summary ? JSON.stringify(item.summary, null, 2) : 'sem conteúdo'}</pre>
+      `;
+      return div;
+    }
+
+    function renderLogCard(item) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      const info = item.info || {};
+      div.innerHTML = `
+        <div class="title">${item.name}</div>
+        <div class="meta">
+          ${info.exists ? `Atualizado: ${fmtTime(info.mtime)} · ${info.size} bytes` : 'Arquivo não encontrado'}
+        </div>
+        <pre>${item.tail || 'sem conteúdo'}</pre>
+      `;
+      return div;
+    }
+
+    async function load() {
+      const res = await fetch('/status');
+      const data = await res.json();
+      document.getElementById('last-update').textContent = `Atualizado: ${fmtTime(data.now)}`;
+
+      const states = document.getElementById('states');
+      states.innerHTML = '';
+      data.states.forEach(s => states.appendChild(renderStateCard(s)));
+
+      const logs = document.getElementById('logs');
+      logs.innerHTML = '';
+      data.logs.forEach(l => logs.appendChild(renderLogCard(l)));
+    }
+
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>
