@@ -269,6 +269,8 @@ def process_asana(path):
 
 def main():
     state = load_state()
+    now_iso = datetime.now().isoformat()
+    state["last_attempt"] = now_iso
     processed = set(state.get("processed", []))
     pending = state.get("pending")
 
@@ -286,6 +288,7 @@ def main():
         processed.add(os.path.basename(path))
         state["pending"] = None
         state["processed"] = sorted(list(processed))
+        state["last_run"] = now_iso
         save_state(state)
         return
 
@@ -293,6 +296,8 @@ def main():
     if not pending:
         next_path = find_next_file(processed)
         if not next_path:
+            state["last_run"] = now_iso
+            save_state(state)
             return
         meta = read_meta(next_path)
         subject = meta.get("subject", "")
@@ -302,6 +307,7 @@ def main():
             "created_at": datetime.now().isoformat(),
             "decision": None,
         }
+        state["last_run"] = now_iso
         save_state(state)
 
 

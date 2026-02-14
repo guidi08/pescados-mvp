@@ -61,8 +61,12 @@
       const statusOk = info.exists && !failure;
       div.className = `card ${statusOk ? 'ok' : 'warn'}`;
 
-      const lastRun = info.exists ? fmtTime(info.mtime) : '—';
-      const lastAttempt = info.exists ? fmtTime(info.mtime) : '—';
+      const s = item.summary || {};
+      const lastRunRaw = s.last_run || s.lastRun || null;
+      const lastAttemptRaw = s.last_attempt || s.lastAttempt || null;
+
+      const lastRun = lastRunRaw ? new Date(lastRunRaw).toLocaleString() : (info.exists ? fmtTime(info.mtime) : '—');
+      const lastAttempt = lastAttemptRaw ? new Date(lastAttemptRaw).toLocaleString() : (info.exists ? fmtTime(info.mtime) : '—');
       const failures = failure || (info.exists ? 'Nenhuma' : 'Arquivo não encontrado');
 
       div.innerHTML = `
