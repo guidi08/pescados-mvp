@@ -1,11 +1,6 @@
-"📌 *LEMBRETE DELIVERY DIÁRIO*
+“📌 LEMBRETE DELIVERY DIÁRIO
 Todas as informações solicitadas devem ser enviadas no grupo do delivery:
 
-✅ *ENVIAR FOTO* do tempo de preparo (99 e Keeta) nas configurações
-✅ *ENVIAR FOTO* do frete + tempo de entrega iFood nas configurações
-✅ *Verificar* se todas as plataformas estão aptas para abrir; se houver problema, avisar imediatamente no grupo
-✅ *AVISAR NO GRUPO* se todos os itens da sacola *ESTÃO DISPONÍVEIS PARA ENVIO*
-
-Pode encaminhar todas as informações acima para o grupo do delivery neste momento, por favor.
-
-Desejo um ótimo turno de trabalho e qualquer problema entre em contato também pelo grupo! Muito obrigado!"
+✅ Verificar e informar o tempo de preparo/entrega das plataformas
+✅ Verificar se todas as plataformas estão aptas para abrir; se houver problema, avisar imediatamente no grupo
+✅ AVISAR NO GRUPO se todos os itens da sacola ESTÃO DISPONÍVEIS PARA ENVIO”
