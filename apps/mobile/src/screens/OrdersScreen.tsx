@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../supabaseClient';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import { colors, spacing, textStyle } from '../theme';
 
 type Order = {
   id: string;
@@ -75,31 +78,36 @@ export default function OrdersScreen({ navigation }: any) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <View style={{ padding: 16, gap: 10 }}>
-        <Text style={{ fontSize: 22, fontWeight: '800' }}>Meus pedidos</Text>
-        <Button title="Voltar" onPress={() => navigation.goBack()} />
-        {loading ? <Text>Carregando...</Text> : null}
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
+      <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
+        <Text style={textStyle('h1')}>Meus pedidos</Text>
+        <Button title="Voltar" onPress={() => navigation.goBack()} size="sm" variant="secondary" />
+        {loading ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Carregando...</Text> : null}
       </View>
 
       <FlatList
         data={orders}
         keyExtractor={(o) => o.id}
-        contentContainerStyle={{ padding: 16, gap: 12 }}
+        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => showDetails(item.id)}
-            style={{ backgroundColor: 'white', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#eee' }}
-          >
-            <Text style={{ fontWeight: '800' }}>Pedido {item.id.slice(0, 8)}...</Text>
-            <Text style={{ color: '#666', marginTop: 4 }}>
-              Status: {item.status} • Pagamento: {item.payment_status}
-            </Text>
-            <Text style={{ marginTop: 6, fontSize: 16 }}>{centsToBRL(item.total_cents)}</Text>
-            {item.delivery_date ? <Text style={{ color: '#666' }}>Entrega: {item.delivery_date}</Text> : null}
+          <TouchableOpacity onPress={() => showDetails(item.id)}>
+            <Card>
+              <Text style={textStyle('h3')}>Pedido {item.id.slice(0, 8)}...</Text>
+              <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}
+              >
+                Status: {item.status} • Pagamento: {item.payment_status}
+              </Text>
+              <Text style={[textStyle('bodyStrong'), { marginTop: spacing['2'] }]}>{centsToBRL(item.total_cents)}</Text>
+              {item.delivery_date ? (
+                <Text style={[textStyle('small'), { color: colors.text.secondary }]}
+                >Entrega: {item.delivery_date}</Text>
+              ) : null}
+            </Card>
           </TouchableOpacity>
         )}
-        ListEmptyComponent={!loading ? <Text style={{ padding: 16, color: '#666' }}>Nenhum pedido ainda.</Text> : null}
+        ListEmptyComponent={!loading ? (
+          <Text style={{ padding: spacing['4'], color: colors.text.secondary }}>Nenhum pedido ainda.</Text>
+        ) : null}
       />
     </SafeAreaView>
   );

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { Alert, Button, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { supabase } from '../supabaseClient';
+import Button from '../components/Button';
+import Input from '../components/Input';
+import { colors, spacing, textStyle } from '../theme';
 
 export default function LoginScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -49,76 +52,61 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
-        <Text style={{ fontSize: 28, fontWeight: '700' }}>Pescados Marketplace</Text>
-        <Text style={{ color: '#555' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
+      <ScrollView contentContainerStyle={{ padding: spacing['5'], gap: spacing['3'] }}>
+        <Text style={textStyle('display')}>Pescados</Text>
+        <Text style={[textStyle('small'), { color: colors.text.secondary }]}
+        >
           {mode === 'login' ? 'Acesse sua conta para comprar.' : 'Crie sua conta (CPF ou CNPJ).'}
         </Text>
 
-        <View style={{ gap: 8 }}>
-          <Text style={{ fontWeight: '600' }}>E-mail</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="seu@email.com"
-            style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12 }}
-          />
-        </View>
+        <Input
+          label="E-mail"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          placeholder="seu@email.com"
+        />
 
-        <View style={{ gap: 8 }}>
-          <Text style={{ fontWeight: '600' }}>Senha</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="••••••••"
-            style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12 }}
-          />
-        </View>
+        <Input
+          label="Senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholder="••••••••"
+        />
 
         {mode === 'signup' && (
           <>
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontWeight: '600' }}>Nome / Razão social</Text>
-              <TextInput
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Seu nome"
-                style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12 }}
-              />
-            </View>
+            <Input
+              label="Nome / Razão social"
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Seu nome"
+            />
 
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontWeight: '600' }}>Tipo de cadastro</Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Button title={docType === 'cpf' ? '✓ CPF' : 'CPF'} onPress={() => setDocType('cpf')} />
-                <Button title={docType === 'cnpj' ? '✓ CNPJ' : 'CNPJ'} onPress={() => setDocType('cnpj')} />
+            <View style={{ gap: spacing['2'] }}>
+              <Text style={textStyle('label')}>Tipo de cadastro</Text>
+              <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
+                <Button title={docType === 'cpf' ? '✓ CPF' : 'CPF'} onPress={() => setDocType('cpf')} variant={docType === 'cpf' ? 'primary' : 'secondary'} />
+                <Button title={docType === 'cnpj' ? '✓ CNPJ' : 'CNPJ'} onPress={() => setDocType('cnpj')} variant={docType === 'cnpj' ? 'primary' : 'secondary'} />
               </View>
             </View>
 
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontWeight: '600' }}>{docType.toUpperCase()}</Text>
-              <TextInput
-                value={docNumber}
-                onChangeText={setDocNumber}
-                placeholder={docType === 'cpf' ? '000.000.000-00' : '00.000.000/0000-00'}
-                style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12 }}
-              />
-            </View>
+            <Input
+              label={docType.toUpperCase()}
+              value={docNumber}
+              onChangeText={setDocNumber}
+              placeholder={docType === 'cpf' ? '000.000.000-00' : '00.000.000/0000-00'}
+            />
 
-            <View style={{ gap: 8 }}>
-              <Text style={{ fontWeight: '600' }}>Telefone (recomendado)</Text>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="(11) 99999-9999"
-                keyboardType="phone-pad"
-                style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12 }}
-              />
-            </View>
+            <Input
+              label="Telefone (recomendado)"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="(11) 99999-9999"
+              keyboardType="phone-pad"
+            />
           </>
         )}
 
@@ -128,9 +116,10 @@ export default function LoginScreen() {
           title={mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
           onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}
           disabled={loading}
+          variant="ghost"
         />
 
-        <Text style={{ color: '#777', fontSize: 12, marginTop: 8 }}>
+        <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}>
           Dica antifraude: ative confirmação de e-mail e, se possível, validação por SMS no Supabase.
         </Text>
       </ScrollView>

@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Button, FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../supabaseClient';
 import { RootStackParamList } from '../../App';
 import { useCart } from '../context/CartContext';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import { colors, spacing, textStyle } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -50,35 +53,37 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <View style={{ padding: 16, gap: 10 }}>
-        <Text style={{ fontSize: 24, fontWeight: '700' }}>Fornecedores</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
+      <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
+        <Text style={textStyle('h1')}>Fornecedores</Text>
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Button title={`Carrinho (${items.length})`} onPress={() => navigation.navigate('Cart')} />
-          <Button title="Meus pedidos" onPress={() => navigation.navigate('Orders')} />
-          <Button title="Sair" onPress={logout} />
+        <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
+          <Button title={`Carrinho (${items.length})`} onPress={() => navigation.navigate('Cart')} size="sm" />
+          <Button title="Meus pedidos" onPress={() => navigation.navigate('Orders')} size="sm" variant="secondary" />
+          <Button title="Sair" onPress={logout} size="sm" variant="ghost" />
         </View>
 
-        {loading ? <Text>Carregando...</Text> : null}
+        {loading ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Carregando...</Text> : null}
       </View>
 
       <FlatList
         data={sellers}
         keyExtractor={(s) => s.id}
-        contentContainerStyle={{ padding: 16, gap: 12 }}
+        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Seller', { sellerId: item.id, sellerName: item.display_name })}
-            style={{ backgroundColor: 'white', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#eee' }}
-          >
-            <Text style={{ fontSize: 16, fontWeight: '700' }}>{item.display_name}</Text>
-            <Text style={{ color: '#666', marginTop: 4 }}>
-              {item.city ? `${item.city}${item.state ? `/${item.state}` : ''}` : '—'} • Cut-off: {item.cutoff_time}
-            </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Seller', { sellerId: item.id, sellerName: item.display_name })}>
+            <Card>
+              <Text style={textStyle('h3')}>{item.display_name}</Text>
+              <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}
+              >
+                {item.city ? `${item.city}${item.state ? `/${item.state}` : ''}` : '—'} • Cut-off: {item.cutoff_time}
+              </Text>
+            </Card>
           </TouchableOpacity>
         )}
-        ListEmptyComponent={!loading ? <Text style={{ padding: 16, color: '#666' }}>Nenhum fornecedor ativo.</Text> : null}
+        ListEmptyComponent={!loading ? (
+          <Text style={{ padding: spacing['4'], color: colors.text.secondary }}>Nenhum fornecedor ativo.</Text>
+        ) : null}
       />
     </SafeAreaView>
   );

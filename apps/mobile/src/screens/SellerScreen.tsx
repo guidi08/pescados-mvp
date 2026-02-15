@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Button, FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { supabase } from '../supabaseClient';
 import { useCart } from '../context/CartContext';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import Badge from '../components/Badge';
+import { colors, spacing, textStyle } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Seller'>;
 
@@ -68,52 +72,56 @@ export default function SellerScreen({ route, navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <View style={{ padding: 16, gap: 10 }}>
-        <Text style={{ fontSize: 22, fontWeight: '700' }}>{sellerName}</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
+      <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
+        <Text style={textStyle('h1')}>{sellerName}</Text>
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Button title={`Carrinho (${items.length})`} onPress={() => navigation.navigate('Cart')} />
-          <Button title="Voltar" onPress={() => navigation.goBack()} />
+        <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
+          <Button title={`Carrinho (${items.length})`} onPress={() => navigation.navigate('Cart')} size="sm" />
+          <Button title="Voltar" onPress={() => navigation.goBack()} size="sm" variant="secondary" />
         </View>
 
         {cartSellerId && cartSellerId !== sellerId ? (
-          <Text style={{ color: '#b45309' }}>
+          <Text style={[textStyle('small'), { color: colors.semantic.warning }]}
+          >
             Atenção: seu carrinho contém itens de outro fornecedor. Ao adicionar aqui, o carrinho será substituído.
           </Text>
         ) : null}
 
-        {loading ? <Text>Carregando...</Text> : null}
+        {loading ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Carregando...</Text> : null}
       </View>
 
       <FlatList
         data={products}
         keyExtractor={(p) => p.id}
-        contentContainerStyle={{ padding: 16, gap: 12 }}
+        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}
         renderItem={({ item }) => (
           <TouchableOpacity
             disabled={!item.active}
             onPress={() => navigation.navigate('Product', { productId: item.id })}
-            style={{
-              backgroundColor: 'white',
-              padding: 14,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#eee',
-              opacity: item.active ? 1 : 0.5,
-            }}
+            style={{ opacity: item.active ? 1 : 0.5 }}
           >
-            <Text style={{ fontSize: 16, fontWeight: '700' }}>{item.name}</Text>
-            <Text style={{ color: '#666', marginTop: 4 }}>
-              {item.fresh ? 'Fresco' : 'Congelado'}
-              {item.min_expiry_date ? ` • Validade mínima: ${item.min_expiry_date}` : ''}
-              {item.pricing_mode === 'per_kg_box' ? ' • Por caixa (peso variável)' : ''}
-            </Text>
-            <Text style={{ marginTop: 6, fontSize: 16 }}>{priceLabel(item)}</Text>
-            {!item.active ? <Text style={{ color: '#666', marginTop: 6 }}>Pausado</Text> : null}
+            <Card>
+              <Text style={textStyle('h3')}>{item.name}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing['2'], marginTop: spacing['2'] }}>
+                <Badge label={item.fresh ? 'Fresco' : 'Congelado'} variant={item.fresh ? 'fresh' : 'frozen'} />
+                {item.pricing_mode === 'per_kg_box' ? <Badge label="Peso variável" variant="variable" /> : null}
+              </View>
+              <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}
+              >
+                {item.min_expiry_date ? `Validade mínima: ${item.min_expiry_date}` : 'Validade: —'}
+              </Text>
+              <Text style={[textStyle('bodyStrong'), { marginTop: spacing['2'] }]}>{priceLabel(item)}</Text>
+              {!item.active ? (
+                <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}
+                >Pausado</Text>
+              ) : null}
+            </Card>
           </TouchableOpacity>
         )}
-        ListEmptyComponent={!loading ? <Text style={{ padding: 16, color: '#666' }}>Nenhum produto.</Text> : null}
+        ListEmptyComponent={!loading ? (
+          <Text style={{ padding: spacing['4'], color: colors.text.secondary }}>Nenhum produto.</Text>
+        ) : null}
       />
     </SafeAreaView>
   );

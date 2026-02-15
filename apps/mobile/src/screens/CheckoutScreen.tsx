@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useCart } from '../context/CartContext';
 import { createOrder, createPaymentSheet, createPixPayment } from '../api';
 import { supabase } from '../supabaseClient';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import { colors, spacing, textStyle } from '../theme';
 
 function centsToBRL(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -40,9 +43,9 @@ export default function CheckoutScreen({ navigation }: any) {
 
   if (!sellerId || items.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, padding: 16 }}>
-        <Text style={{ fontSize: 18, fontWeight: '700' }}>Carrinho vazio</Text>
-        <Button title="Voltar" onPress={() => navigation.goBack()} />
+      <SafeAreaView style={{ flex: 1, padding: spacing['4'], backgroundColor: colors.background.app }}>
+        <Text style={textStyle('h2')}>Carrinho vazio</Text>
+        <Button title="Voltar" onPress={() => navigation.goBack()} variant="secondary" />
       </SafeAreaView>
     );
   }
@@ -131,40 +134,47 @@ export default function CheckoutScreen({ navigation }: any) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text style={{ fontSize: 22, fontWeight: '800' }}>Checkout</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
+      <ScrollView contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}>
+        <Text style={textStyle('h1')}>Checkout</Text>
 
-        <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#eee', gap: 6 }}>
-          <Text style={{ fontWeight: '800' }}>Resumo</Text>
-          <Text style={{ color: '#666' }}>Subtotal (estimado): {centsToBRL(subtotalCents)}</Text>
-          <Text style={{ color: '#666' }}>Frete (fixo do fornecedor): {centsToBRL(shippingEstimateCents)}</Text>
-          <Text style={{ fontSize: 16, fontWeight: '800', marginTop: 6 }}>Total estimado: {centsToBRL(totalEstimateCents)}</Text>
+        <Card>
+          <Text style={textStyle('h3')}>Resumo</Text>
+          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>
+            Subtotal (estimado): {centsToBRL(subtotalCents)}
+          </Text>
+          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>
+            Frete (fixo do fornecedor): {centsToBRL(shippingEstimateCents)}
+          </Text>
+          <Text style={[textStyle('bodyStrong'), { marginTop: spacing['2'] }]}
+          >Total estimado: {centsToBRL(totalEstimateCents)}</Text>
           {seller?.min_order_cents ? (
-            <Text style={{ color: subtotalCents < seller.min_order_cents ? '#b91c1c' : '#166534', marginTop: 6 }}>
+            <Text style={{ color: subtotalCents < seller.min_order_cents ? colors.semantic.error : colors.semantic.success, marginTop: spacing['2'] }}>
               Pedido mínimo: {centsToBRL(seller.min_order_cents)}
             </Text>
           ) : null}
-        </View>
+        </Card>
 
-        <View style={{ gap: 8 }}>
-          <Text style={{ fontWeight: '700' }}>Observações de entrega</Text>
+        <Card>
+          <Text style={textStyle('label')}>Observações de entrega</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
             placeholder="Ex: entregar na portaria / ligar antes"
-            style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12 }}
+            placeholderTextColor={colors.text.tertiary}
+            style={{ borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, marginTop: spacing['2'], backgroundColor: colors.background.surface, color: colors.text.primary }}
             multiline
           />
-        </View>
+        </Card>
 
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: spacing['2'] }}>
           <Button title={loading ? 'Processando...' : 'Pagar com cartão / Apple Pay / Google Pay'} onPress={payWithCard} disabled={loading} />
-          <Button title={loading ? 'Processando...' : 'Pagar com Pix'} onPress={payWithPix} disabled={loading} />
-          <Button title="Voltar" onPress={() => navigation.goBack()} />
+          <Button title={loading ? 'Processando...' : 'Pagar com Pix'} onPress={payWithPix} disabled={loading} variant="secondary" />
+          <Button title="Voltar" onPress={() => navigation.goBack()} variant="ghost" />
         </View>
 
-        <Text style={{ color: '#666', fontSize: 12 }}>
+        <Text style={[textStyle('caption'), { color: colors.text.tertiary }]}
+        >
           * Em produtos por caixa (peso variável), o valor é estimado. Em B2B pode haver ajuste de saldo após emissão da NF/peso final.
         </Text>
       </ScrollView>

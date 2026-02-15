@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { supabase } from '../supabaseClient';
 import { useCart } from '../context/CartContext';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import Badge from '../components/Badge';
+import { colors, spacing, textStyle } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Product'>;
 
@@ -143,8 +147,8 @@ export default function ProductScreen({ route, navigation }: Props) {
 
   if (!product) {
     return (
-      <SafeAreaView style={{ flex: 1, padding: 16 }}>
-        <Text>Carregando...</Text>
+      <SafeAreaView style={{ flex: 1, padding: spacing['4'], backgroundColor: colors.background.app }}>
+        <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Carregando...</Text>
       </SafeAreaView>
     );
   }
@@ -156,58 +160,60 @@ export default function ProductScreen({ route, navigation }: Props) {
       : Math.round(unitPriceCents * (Number(estimatedBoxWeightKg ?? 0) * (Number.isFinite(qPreview) ? qPreview : 0)));
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text style={{ fontSize: 22, fontWeight: '800' }}>{product.name}</Text>
-        <Text style={{ color: '#666' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
+      <ScrollView contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}>
+        <Text style={textStyle('h1')}>{product.name}</Text>
+        <Text style={[textStyle('small'), { color: colors.text.secondary }]}>
           {(product as any).sellers?.display_name ? `Fornecedor: ${(product as any).sellers.display_name}` : ''}
         </Text>
 
-        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-          <Text style={{ color: product.fresh ? '#166534' : '#444', fontWeight: '700' }}>
-            {product.fresh ? 'FRESCO' : 'CONGELADO'}
-          </Text>
-          {minExpiry ? <Text style={{ color: '#666' }}>Validade mínima: {minExpiry}</Text> : null}
-          {product.tags?.length ? <Text style={{ color: '#666' }}>• {product.tags.join(' • ')}</Text> : null}
+        <View style={{ flexDirection: 'row', gap: spacing['2'], flexWrap: 'wrap' }}>
+          <Badge label={product.fresh ? 'Fresco' : 'Congelado'} variant={product.fresh ? 'fresh' : 'frozen'} />
+          {pricingMode === 'per_kg_box' ? <Badge label="Peso variável" variant="variable" /> : null}
+          {product.tags?.length ? <Badge label={product.tags.join(' • ')} variant="variable" /> : null}
         </View>
 
-        {product.description ? <Text style={{ color: '#444' }}>{product.description}</Text> : null}
+        {minExpiry ? (
+          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Validade mínima: {minExpiry}</Text>
+        ) : null}
+
+        {product.description ? <Text style={[textStyle('body'), { color: colors.text.primary }]}>{product.description}</Text> : null}
 
         {pricingMode === 'per_kg_box' ? (
-          <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#eee' }}>
-            <Text style={{ fontWeight: '800' }}>Produto por caixa (peso variável)</Text>
-            <Text style={{ color: '#666', marginTop: 6 }}>
-              Preço é por <Text style={{ fontWeight: '700' }}>kg</Text>. Você compra por <Text style={{ fontWeight: '700' }}>caixa</Text>.
+          <Card>
+            <Text style={textStyle('h3')}>Produto por caixa (peso variável)</Text>
+            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>
+              Preço é por kg. Você compra por caixa.
             </Text>
-            <Text style={{ color: '#666', marginTop: 6 }}>
-              Peso estimado: <Text style={{ fontWeight: '700' }}>{estimatedBoxWeightKg ?? '—'} kg/caixa</Text>
-              {maxVarPct ? ` • variação máx.: ${maxVarPct}%` : ''}
+            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>
+              Peso estimado: {estimatedBoxWeightKg ?? '—'} kg/caixa{maxVarPct ? ` • variação máx.: ${maxVarPct}%` : ''}
             </Text>
-            <Text style={{ color: '#666', marginTop: 6, fontSize: 12 }}>
+            <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}>
               O valor final pode variar. Em B2B, o ajuste pode gerar crédito/débito no saldo do cliente.
             </Text>
-          </View>
+          </Card>
         ) : null}
 
         {variants.length ? (
-          <View style={{ gap: 8 }}>
-            <Text style={{ fontWeight: '700' }}>Escolha o calibre/tamanho</Text>
-            <View style={{ gap: 8 }}>
+          <View style={{ gap: spacing['2'] }}>
+            <Text style={textStyle('label')}>Escolha o calibre/tamanho</Text>
+            <View style={{ gap: spacing['2'] }}>
               {variants.map((v) => (
                 <Button
                   key={v.id}
                   title={`${selectedVariantId === v.id ? '✓ ' : ''}${v.name} — ${centsToBRL(v.price_cents)}/${priceUnitLabel}`}
                   onPress={() => setSelectedVariantId(v.id)}
+                  variant={selectedVariantId === v.id ? 'primary' : 'secondary'}
                 />
               ))}
             </View>
           </View>
         ) : (
-          <Text style={{ fontSize: 18 }}>{centsToBRL(product.base_price_cents)} / {priceUnitLabel}</Text>
+          <Text style={textStyle('h2')}>{centsToBRL(product.base_price_cents)} / {priceUnitLabel}</Text>
         )}
 
-        <View style={{ gap: 8 }}>
-          <Text style={{ fontWeight: '700' }}>
+        <View style={{ gap: spacing['2'] }}>
+          <Text style={textStyle('label')}>
             Quantidade ({pricingMode === 'per_kg_box' ? 'caixas' : product.unit})
           </Text>
           <TextInput
@@ -215,16 +221,18 @@ export default function ProductScreen({ route, navigation }: Props) {
             onChangeText={setQuantity}
             keyboardType={pricingMode === 'per_kg_box' ? 'number-pad' : 'decimal-pad'}
             placeholder="1"
-            style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12 }}
+            placeholderTextColor={colors.text.tertiary}
+            style={{ borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
           />
-          <Text style={{ color: '#666' }}>
+          <Text style={[textStyle('small'), { color: colors.text.secondary }]}
+          >
             Total estimado: {centsToBRL(Number.isFinite(estimatedTotalCents) ? estimatedTotalCents : 0)}
           </Text>
         </View>
 
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: spacing['2'] }}>
           <Button title="Adicionar ao carrinho" onPress={onAddToCart} />
-          <Button title="Voltar" onPress={() => navigation.goBack()} />
+          <Button title="Voltar" onPress={() => navigation.goBack()} variant="secondary" />
         </View>
       </ScrollView>
     </SafeAreaView>
