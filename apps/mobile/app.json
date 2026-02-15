@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Pescados Marketplace",
+    "slug": "pescados-marketplace",
+    "scheme": "pescados",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.seudominio.pescados"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.seudominio.pescados"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_ME"
+      }
+    }
+  }
+}

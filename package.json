@@ -1,0 +1,13 @@
+{
+  "name": "pescados-marketplace-mvp",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace apps/api run dev",
+    "dev:admin": "npm --workspace apps/admin run dev",
+    "dev:mobile": "npm --workspace apps/mobile run start",
+    "lint": "echo \"(opcional)\""
+  }
+}
