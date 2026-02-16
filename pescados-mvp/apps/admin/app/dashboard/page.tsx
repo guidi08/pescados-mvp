@@ -331,7 +331,7 @@ export default function DashboardPage() {
           <div className="row" style={{ marginTop: 12 }}>
             <div style={{ flex: 1 }}>
               <label className="label">Recebimentos (Stripe)</label>
-              <div className="row" style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div className="row inline" style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span className={`badge ${seller.stripe_account_id ? 'green' : 'gray'}`}>
                   {seller.stripe_account_id ? 'Conta conectada' : 'Não configurado'}
                 </span>
