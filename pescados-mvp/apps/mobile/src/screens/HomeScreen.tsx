@@ -17,22 +17,44 @@ type Seller = {
   state: string | null;
   cutoff_time: string;
   active: boolean;
+  b2c_enabled?: boolean;
 };
 
 export default function HomeScreen({ navigation }: Props) {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
+  const [buyerChannel, setBuyerChannel] = useState<'b2b' | 'b2c'>('b2c');
   const { items } = useCart();
 
   async function load() {
     setLoading(true);
+
+    // Determine channel (B2B if profile has CNPJ)
+    let channel: 'b2b' | 'b2c' = 'b2c';
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (userId) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('cnpj')
+        .eq('id', userId)
+        .single();
+      channel = prof?.cnpj ? 'b2b' : 'b2c';
+      setBuyerChannel(channel);
+    }
+
     const { data, error } = await supabase
       .from('sellers')
-      .select('id, display_name, city, state, cutoff_time, active')
+      .select('id, display_name, city, state, cutoff_time, active, b2c_enabled')
       .eq('active', true)
       .order('display_name', { ascending: true });
 
-    if (!error) setSellers((data ?? []) as any);
+    if (!error) {
+      const list = (data ?? []) as any as Seller[];
+      // B2C: only sellers with b2c_enabled
+      const filtered = channel === 'b2c' ? list.filter((s) => !!s.b2c_enabled) : list;
+      setSellers(filtered);
+    }
     setLoading(false);
   }
 
@@ -56,10 +78,15 @@ export default function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
       <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
         <Text style={textStyle('h1')}>Fornecedores</Text>
+        <Text style={[textStyle('small'), { color: colors.text.secondary }]}
+        >Canal: {buyerChannel === 'b2b' ? 'B2B (CNPJ)' : 'B2C (CPF)'}</Text>
 
         <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
           <Button title={`Carrinho (${items.length})`} onPress={() => navigation.navigate('Cart')} size="sm" />
           <Button title="Meus pedidos" onPress={() => navigation.navigate('Orders')} size="sm" variant="secondary" />
+          {buyerChannel === 'b2b' ? (
+            <Button title="Saldo" onPress={() => navigation.navigate('Wallet')} size="sm" variant="secondary" />
+          ) : null}
           <Button title="Sair" onPress={logout} size="sm" variant="ghost" />
         </View>
 

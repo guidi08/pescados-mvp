@@ -250,6 +250,7 @@ create table if not exists public.seller_reserves (
   id uuid primary key default gen_random_uuid(),
   seller_id uuid not null references public.sellers(id) on delete cascade,
   order_id uuid not null references public.orders(id) on delete cascade,
+  constraint seller_reserves_order_unique unique (order_id),
 
   amount_cents integer not null,
   currency text not null default 'brl',

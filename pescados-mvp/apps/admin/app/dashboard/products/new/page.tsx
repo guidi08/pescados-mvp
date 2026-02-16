@@ -12,26 +12,20 @@ function brlToCents(input: string): number {
 export default function NewProductPage() {
   const [loading, setLoading] = useState(true);
   const [sellerId, setSellerId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const [name, setName] = useState('');
-  const [namePreset, setNamePreset] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
-
-  const unit = 'cx';
-  const [pricingMode, setPricingMode] = useState<'variable' | 'fixed'>('variable');
-
+  const [unit, setUnit] = useState('kg');
+  const [pricingMode, setPricingMode] = useState<'per_unit' | 'per_kg_box'>('per_unit');
   const [estimatedBoxWeightKg, setEstimatedBoxWeightKg] = useState('30');
-  const [maxVarPct, setMaxVarPct] = useState('12');
-
+  const [maxVarPct, setMaxVarPct] = useState('10');
   const [fresh, setFresh] = useState(false);
-  const [freshExpiryDays, setFreshExpiryDays] = useState('');
-  const [frozenExpiryMonth, setFrozenExpiryMonth] = useState('');
-  const [frozenExpiryDate, setFrozenExpiryDate] = useState('');
-
-  const [price, setPrice] = useState('0.00');
-
-  const [msg, setMsg] = useState<string | null>(null);
+  const [minExpiry, setMinExpiry] = useState('');
+  const [tags, setTags] = useState('');
+  const [price, setPrice] = useState('0');
+  const [active, setActive] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -42,170 +36,93 @@ export default function NewProductPage() {
         return;
       }
 
-      const userId = session.user.id;
-      const { data: prof } = await supabase.from('profiles').select('seller_id').eq('id', userId).single();
-      if (!prof?.seller_id) {
-        setMsg('Seu usuário não está vinculado a um fornecedor (profiles.seller_id).');
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('seller_id, role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile?.seller_id) {
+        setMsg('Seu usuário não está vinculado a um fornecedor (seller_id).');
         setLoading(false);
         return;
       }
 
-      setSellerId(prof.seller_id);
+      setSellerId(profile.seller_id);
       setLoading(false);
     })();
   }, []);
 
-  function formatDate(d: Date): string {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  function computeMinExpiryDate(): string | null {
-    if (fresh) {
-      const days = Number(freshExpiryDays);
-      if (!Number.isFinite(days) || days <= 0) return null;
-      const d = new Date();
-      d.setDate(d.getDate() + Math.round(days));
-      return formatDate(d);
-    }
-
-    if (frozenExpiryDate) return frozenExpiryDate;
-
-    if (!frozenExpiryMonth) return null;
-    const [y, m] = frozenExpiryMonth.split('-').map(Number);
-    if (!y || !m) return null;
-    // last day of month
-    const d = new Date(y, m, 0);
-    return formatDate(d);
-  }
-
-  async function create() {
+  async function createProduct() {
     if (!sellerId) return;
     setMsg(null);
 
-    const finalName = (namePreset === '__custom__' ? name : namePreset).trim();
-
-    if (!finalName) {
+    const basePriceCents = brlToCents(price);
+    if (!name.trim()) {
       setMsg('Informe o nome do produto.');
       return;
     }
+    if (!basePriceCents || basePriceCents <= 0) {
+      setMsg('Informe um preço válido.');
+      return;
+    }
 
-    const payload: any = {
+    const insert: any = {
       seller_id: sellerId,
-      name: finalName,
-      description: description.trim() || null,
-      category: category.trim() || null,
-      unit,
-      pricing_mode: 'per_kg_box',
+      name: name.trim(),
+      description: description.trim() ? description.trim() : null,
+      category: category.trim() ? category.trim() : null,
+      unit: unit.trim() || 'un',
+      pricing_mode: pricingMode,
+      estimated_box_weight_kg: pricingMode === 'per_kg_box' ? Number(estimatedBoxWeightKg) : null,
+      max_weight_variation_pct: pricingMode === 'per_kg_box' ? Number(maxVarPct) : null,
       fresh,
-      min_expiry_date: computeMinExpiryDate(),
-      base_price_cents: brlToCents(price),
-      active: true,
-      currency: 'brl',
+      tags: tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : null,
+      min_expiry_date: minExpiry.trim() ? minExpiry.trim() : null,
+      base_price_cents: basePriceCents,
+      active,
     };
 
-    payload.estimated_box_weight_kg = Number(estimatedBoxWeightKg.replace(',', '.')) || 30;
-    payload.max_weight_variation_pct = fresh
-      ? 12
-      : (pricingMode === 'fixed'
-        ? 0
-        : (Number(maxVarPct.replace(',', '.')) || 0));
+    const { data, error } = await supabase
+      .from('products')
+      .insert(insert)
+      .select('id')
+      .single();
 
-    const { error } = await supabase.from('products').insert(payload);
     if (error) {
       setMsg(error.message);
       return;
     }
 
-    window.location.href = '/dashboard';
+    window.location.href = `/dashboard/products/${data.id}`;
   }
 
   if (loading) {
     return (
       <div className="container">
-        <div className="card">
-          <h1>Novo produto</h1>
-          <p>Carregando...</p>
-        </div>
+        <div className="card">Carregando...</div>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1>Novo produto</h1>
-        <button className="btn secondary" onClick={() => (window.location.href = '/dashboard')}>Voltar</button>
+      <div className="row inline" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+        <h2>Novo produto</h2>
+        <a className="btn secondary" href="/dashboard">Voltar</a>
       </div>
 
-      {msg && <p style={{ marginTop: 12 }}>{msg}</p>}
+      {msg ? <div className="card" style={{ border: '1px solid #ffd2d2', color: '#a00', marginBottom: 12 }}>{msg}</div> : null}
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card">
         <div className="row">
-          <div style={{ flex: 1 }}>
+          <div>
             <label className="label">Nome</label>
-            <select
-              className="input"
-              value={namePreset}
-              onChange={(e) => {
-                setNamePreset(e.target.value);
-                if (e.target.value !== '__custom__') setName('');
-              }}
-            >
-              <option value="">Selecione...</option>
-              <option value="Salmão inteiro Fresco 6/8">Salmão inteiro Fresco 6/8</option>
-              <option value="Salmão inteiro Fresco 8/10">Salmão inteiro Fresco 8/10</option>
-              <option value="Salmão inteiro Fresco 10/12">Salmão inteiro Fresco 10/12</option>
-              <option value="Salmão inteiro Fresco 12/14">Salmão inteiro Fresco 12/14</option>
-              <option value="Salmão Inteiro Fresco 14/16">Salmão Inteiro Fresco 14/16</option>
-              <option value="Salmão Inteiro Fresco 16/18">Salmão Inteiro Fresco 16/18</option>
-              <option value="Salmão Inteiro Fresco 18/20">Salmão Inteiro Fresco 18/20</option>
-              <option value="Salmão Inteiro Fresco 20/up">Salmão Inteiro Fresco 20/up</option>
-              <option value="Filé de Saint Peter Fresco">Filé de Saint Peter Fresco</option>
-              <option value="Filé de Saint Peter">Filé de Saint Peter</option>
-              <option value="Filé de Salmão 800/1200">Filé de Salmão 800/1200</option>
-              <option value="Filé de Salmão 1200/1500">Filé de Salmão 1200/1500</option>
-              <option value="Filé de Salmão 1500/2000">Filé de Salmão 1500/2000</option>
-              <option value="Filé de Salmão 2000/2500">Filé de Salmão 2000/2500</option>
-              <option value="Filé de Salmão 3000 acima">Filé de Salmão 3000 acima</option>
-              <option value="Centolla 1kg">Centolla 1kg</option>
-              <option value="Centolla 1 a 1,2kg">Centolla 1 a 1,2kg</option>
-              <option value="Centolla 1,2 a 1,4kg">Centolla 1,2 a 1,4kg</option>
-              <option value="Centolla 1,4 a 1,6kg">Centolla 1,4 a 1,6kg</option>
-              <option value="Centolla 1,6 a 1,8kg">Centolla 1,6 a 1,8kg</option>
-              <option value="Centolla 1,8 a 2kg">Centolla 1,8 a 2kg</option>
-              <option value="Centolla 2 a 2,2kg">Centolla 2 a 2,2kg</option>
-              <option value="Centolla 2,2 a 2,4kg">Centolla 2,2 a 2,4kg</option>
-              <option value="Centolla 2,4kg acima">Centolla 2,4kg acima</option>
-              <option value="Polvo 500g abaixo">Polvo 500g abaixo</option>
-              <option value="Polvo 500g a 1kg">Polvo 500g a 1kg</option>
-              <option value="Polvo 1 a 1,5kg">Polvo 1 a 1,5kg</option>
-              <option value="Polvo 1.5 a 2kg">Polvo 1.5 a 2kg</option>
-              <option value="Polvo 2 a 2,5kg">Polvo 2 a 2,5kg</option>
-              <option value="Polvo 2,5 a 3kg">Polvo 2,5 a 3kg</option>
-              <option value="__custom__">Outro (digitar)</option>
-            </select>
-            {namePreset === '__custom__' && (
-              <input
-                className="input"
-                style={{ marginTop: 8 }}
-                placeholder="Digite o nome"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            )}
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Salmão fresco" />
           </div>
-
-          <div style={{ width: 260 }}>
+          <div>
             <label className="label">Categoria</label>
-            <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">Selecione...</option>
-              <option value="Pescados">Pescados</option>
-              <option value="Frutos do Mar">Frutos do Mar</option>
-              <option value="Iguarias">Iguarias</option>
-            </select>
+            <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex: Salmão" />
           </div>
         </div>
 
@@ -216,96 +133,62 @@ export default function NewProductPage() {
 
         <div className="row" style={{ marginTop: 12 }}>
           <div>
-            <label className="label">Modo de precificação</label>
+            <label className="label">Preço base (R$)</label>
+            <input className="input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex: 59,90" />
+            <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+              Para “caixa com peso variável”, este é o preço por kg.
+            </div>
+          </div>
+          <div>
+            <label className="label">Unidade</label>
+            <input className="input" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="kg / cx / un" />
+          </div>
+          <div>
+            <label className="label">Modo de preço</label>
             <select className="input" value={pricingMode} onChange={(e) => setPricingMode(e.target.value as any)}>
-              <option value="variable">Por kg, vendido por caixa de peso variável</option>
-              <option value="fixed">Por kg com caixa de peso fixo</option>
+              <option value="per_unit">Por unidade (kg/un/cx)</option>
+              <option value="per_kg_box">Por kg, vendido por caixa (peso variável)</option>
             </select>
           </div>
-
-          <div>
-            <label className="label">Unidade (para o pedido)</label>
-            <input className="input" value={unit} disabled />
-          </div>
-
-          <div>
-            <label className="label">Fresco</label>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
-              <input type="checkbox" checked={fresh} onChange={(e) => {
-                setFresh(e.target.checked);
-                setFreshExpiryDays('');
-                setFrozenExpiryMonth('');
-                setFrozenExpiryDate('');
-              }} />
-              Sim (produto fresco)
-            </label>
-            {fresh && (
-              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-                Produtos frescos: variação de caixa fixada entre 10–12% (ajustamos manualmente se o tamanho for muito grande).
-              </div>
-            )}
-          </div>
         </div>
 
-        <div className="row" style={{ marginTop: 12 }}>
-          <div>
-            <label className="label">Peso estimado (kg por caixa)</label>
-            <input className="input" value={estimatedBoxWeightKg} onChange={(e) => setEstimatedBoxWeightKg(e.target.value)} />
-          </div>
-          {pricingMode === 'variable' && !fresh && (
+        {pricingMode === 'per_kg_box' ? (
+          <div className="row" style={{ marginTop: 12 }}>
             <div>
-              <label className="label">Variação máxima (%)</label>
+              <label className="label">Peso estimado por caixa (kg)</label>
+              <input className="input" value={estimatedBoxWeightKg} onChange={(e) => setEstimatedBoxWeightKg(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Variação máx. (%)</label>
               <input className="input" value={maxVarPct} onChange={(e) => setMaxVarPct(e.target.value)} />
             </div>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <div className="row" style={{ marginTop: 12 }}>
           <div>
-            <label className="label">Validade mínima</label>
-            {fresh ? (
-              <input
-                className="input"
-                type="number"
-                min="1"
-                placeholder="Dias"
-                value={freshExpiryDays}
-                onChange={(e) => setFreshExpiryDays(e.target.value)}
-              />
-            ) : (
-              <>
-                <input
-                  className="input"
-                  type="month"
-                  value={frozenExpiryMonth}
-                  onChange={(e) => setFrozenExpiryMonth(e.target.value)}
-                />
-                <input
-                  className="input"
-                  type="date"
-                  style={{ marginTop: 8 }}
-                  value={frozenExpiryDate}
-                  onChange={(e) => setFrozenExpiryDate(e.target.value)}
-                  placeholder="Data completa (opcional)"
-                />
-              </>
-            )}
-            <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-              {fresh ? 'Informe quantidade de dias (opcional)' : 'Selecione mês/ano ou data completa (opcional)'}
-            </div>
+            <label className="label">Tags (separadas por vírgula)</label>
+            <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Ex: Fresco, Sushi grade" />
           </div>
-
           <div>
-            <label className="label">Preço</label>
-            <input className="input" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
-            <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-              Preço por kg (venda por caixa)
-            </div>
+            <label className="label">Validade mínima (YYYY-MM-DD)</label>
+            <input className="input" value={minExpiry} onChange={(e) => setMinExpiry(e.target.value)} placeholder="2026-02-20" />
           </div>
         </div>
 
-        <div style={{ marginTop: 16 }}>
-          <button className="btn" onClick={create}>Criar produto</button>
+        <div className="row inline" style={{ marginTop: 12, gap: 16 }}>
+          <label className="row inline" style={{ gap: 8 }}>
+            <input type="checkbox" checked={fresh} onChange={(e) => setFresh(e.target.checked)} />
+            Fresco
+          </label>
+          <label className="row inline" style={{ gap: 8 }}>
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+            Ativo
+          </label>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <button className="btn" onClick={createProduct}>Criar</button>
         </div>
       </div>
     </div>

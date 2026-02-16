@@ -22,12 +22,12 @@ type Seller = {
   b2c_enabled: boolean;
   delivery_days?: number[] | null;
 
-  risk_reserve_bps: number;
-  risk_reserve_days: number;
-
   stripe_account_id: string | null;
   stripe_account_charges_enabled: boolean;
   stripe_account_payouts_enabled: boolean;
+
+  risk_reserve_bps?: number | null;
+  risk_reserve_days?: number | null;
 };
 
 type Product = {
@@ -224,6 +224,8 @@ export default function DashboardPage() {
         <div>
           <button className="btn secondary" onClick={() => (window.location.href = '/dashboard/products/new')}>+ Novo produto</button>
           <span style={{ marginLeft: 8 }} />
+          <button className="btn secondary" onClick={() => (window.location.href = '/dashboard/orders')}>Pedidos</button>
+          <span style={{ marginLeft: 8 }} />
           <button className="btn" onClick={logout}>Sair</button>
         </div>
       </div>
@@ -286,6 +288,24 @@ export default function DashboardPage() {
                 value={(seller.min_order_cents / 100).toFixed(2)}
                 onChange={(e) => setSeller({ ...seller, min_order_cents: brlToCents(e.target.value) })}
               />
+            </div>
+
+            <div>
+              <label className="label">Reserva de risco (%)</label>
+              <input
+                className="input"
+                type="number"
+                step="0.1"
+                value={((seller.risk_reserve_bps ?? 0) / 100).toFixed(1)}
+                onChange={(e) => {
+                  const pct = Number(String(e.target.value).replace(',', '.'));
+                  const bps = Number.isFinite(pct) ? Math.max(0, Math.round(pct * 100)) : 0;
+                  setSeller({ ...seller, risk_reserve_bps: bps });
+                }}
+              />
+              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+                Retido por {seller.risk_reserve_days ?? 60} dias e liberado depois (proteção contra chargeback).
+              </div>
             </div>
 
             <div>
@@ -363,6 +383,7 @@ export default function DashboardPage() {
               shipping_fee_cents: seller.shipping_fee_cents,
               min_order_cents: seller.min_order_cents,
               b2c_enabled: seller.b2c_enabled,
+              risk_reserve_bps: seller.risk_reserve_bps ?? 0,
               delivery_days: seller.delivery_days ?? [1, 2, 3, 4, 5],
             })}>
               Salvar

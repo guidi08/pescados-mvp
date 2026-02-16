@@ -119,6 +119,25 @@ app.post('/orders', requireAuth, async (req: AuthedRequest, res) => {
 
   const buyerChannel: 'b2b' | 'b2c' = buyerProfile?.cnpj ? 'b2b' : 'b2c';
 
+  // B2B: block new orders if buyer has negative wallet balance (peso variável pendente).
+  if (buyerChannel === 'b2b') {
+    await ensureBuyerWallet(buyerId);
+    const { data: wallet } = await supabaseService
+      .from('buyer_wallets')
+      .select('balance_cents,currency')
+      .eq('buyer_id', buyerId)
+      .single();
+
+    const balanceCents = Number(wallet?.balance_cents ?? 0);
+    if (balanceCents < 0) {
+      return res.status(400).json({
+        error: 'wallet_negative_balance',
+        balanceCents,
+        balance: formatBRL(balanceCents),
+      });
+    }
+  }
+
   // seller
   const { data: seller, error: sellerError } = await supabaseService
     .from('sellers')
@@ -251,7 +270,7 @@ app.post('/orders', requireAuth, async (req: AuthedRequest, res) => {
   const riskReserveBps = Number(seller.risk_reserve_bps ?? 0);
   const riskReserveCents = Math.round((subtotalCents * riskReserveBps) / 10_000);
 
-  // Reserve is platform-owned (not released to seller)
+  // Reserve is held by the platform for X days and later released via /jobs/release-reserves.
   const sellerPayoutCents = Math.max(0, totalCents - platformFeeCents - riskReserveCents);
 
   // Delivery date based on cutoff + delivery days
@@ -449,6 +468,112 @@ app.post('/payments/stripe/pix', requireAuth, async (req: AuthedRequest, res) =>
 });
 
 /**
+ * ---------- Wallet (B2B saldo) ----------
+ * MVP: used to settle variable-weight adjustments.
+ */
+app.get('/wallet/me', requireAuth, async (req: AuthedRequest, res) => {
+  const buyerId = req.user!.id;
+  await ensureBuyerWallet(buyerId);
+
+  const [{ data: wallet }, { data: txs }] = await Promise.all([
+    supabaseService.from('buyer_wallets').select('*').eq('buyer_id', buyerId).single(),
+    supabaseService
+      .from('wallet_transactions')
+      .select('*')
+      .eq('buyer_id', buyerId)
+      .order('created_at', { ascending: false })
+      .limit(30),
+  ]);
+
+  const balanceCents = Number(wallet?.balance_cents ?? 0);
+
+  return res.json({
+    balanceCents,
+    balance: formatBRL(balanceCents),
+    currency: wallet?.currency ?? 'brl',
+    transactions: txs ?? [],
+  });
+});
+
+const walletTopupSchema = z.object({
+  amountCents: z.number().int().positive().max(50_000_00), // max R$ 50.000,00
+});
+
+app.post('/wallet/topup/payment-sheet', requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = walletTopupSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
+
+  const buyerId = req.user!.id;
+  const amountCents = parsed.data.amountCents;
+
+  const customerId = await ensureStripeCustomer(buyerId, req.user!.email ?? undefined);
+
+  const ephemeralKey = await stripe.ephemeralKeys.create(
+    { customer: customerId },
+    { apiVersion: '2024-06-20' }
+  );
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amountCents,
+    currency: 'brl',
+    customer: customerId,
+    payment_method_types: ['card'],
+    metadata: {
+      wallet_topup: 'true',
+      buyer_id: buyerId,
+    },
+    description: 'Recarga de saldo (carteira B2B)',
+  });
+
+  return res.json({
+    paymentIntentClientSecret: paymentIntent.client_secret,
+    customerId,
+    customerEphemeralKeySecret: ephemeralKey.secret,
+    publishableKey: env.STRIPE_PUBLISHABLE_KEY,
+  });
+});
+
+app.post('/wallet/topup/pix', requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = walletTopupSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
+
+  const buyerId = req.user!.id;
+  const amountCents = parsed.data.amountCents;
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amountCents,
+    currency: 'brl',
+    payment_method_types: ['pix'],
+    metadata: {
+      wallet_topup: 'true',
+      buyer_id: buyerId,
+    },
+    receipt_email: req.user!.email ?? undefined,
+    payment_method_options: {
+      pix: { expires_after_seconds: 3600 },
+    } as any,
+    description: 'Recarga de saldo (carteira B2B) via Pix',
+  });
+
+  const pix = (paymentIntent.next_action as any)?.pix_display_qr_code ?? null;
+
+  return res.json({
+    paymentIntentId: paymentIntent.id,
+    clientSecret: paymentIntent.client_secret,
+    pix: pix
+      ? {
+          data: pix.data,
+          expiresAt: pix.expires_at,
+          hostedInstructionsUrl: pix.hosted_instructions_url,
+          imageUrlPng: pix.image_url_png,
+          imageUrlSvg: pix.image_url_svg,
+        }
+      : null,
+    total: formatBRL(amountCents),
+  });
+});
+
+/**
  * ---------- Seller: Stripe Connect onboarding link ----------
  * Called from the seller portal to let the seller complete KYC and set bank details.
  */
@@ -538,6 +663,13 @@ app.post('/orders/:orderId/cancel', requireAuth, async (req: AuthedRequest, res)
     payment_status: order.payment_status === 'succeeded' ? 'refunded' : 'canceled',
   }).eq('id', order.id);
 
+  // If there is a rolling reserve held for this order, it should not be released later.
+  await supabaseService
+    .from('seller_reserves')
+    .update({ status: 'forfeited' })
+    .eq('order_id', order.id)
+    .eq('status', 'held');
+
   return res.json({ ok: true, status: 'canceled' });
 });
 
@@ -566,12 +698,19 @@ app.post('/orders/:orderId/weights', requireAuth, async (req: AuthedRequest, res
   const { data: order } = await supabaseService.from('orders').select('*').eq('id', orderId).single();
   if (!order) return res.status(404).json({ error: 'order_not_found' });
 
+  if (order.payment_status !== 'succeeded') {
+    return res.status(400).json({ error: 'order_not_paid' });
+  }
+
   if (!isAdmin && profile?.seller_id !== order.seller_id) {
     return res.status(403).json({ error: 'forbidden' });
   }
 
   const { data: orderItems } = await supabaseService.from('order_items').select('*').eq('order_id', orderId);
   const itemsById = new Map<string, any>((orderItems ?? []).map(i => [i.id, i]));
+
+  // Cache product configs (to validate max variation)
+  const maxVarByProductId = new Map<string, number>();
 
   let totalDeltaCents = 0;
 
@@ -588,6 +727,34 @@ app.post('/orders/:orderId/weights', requireAuth, async (req: AuthedRequest, res
 
     if (!Number.isFinite(estimated) || estimated <= 0) {
       return res.status(400).json({ error: 'missing_estimated_weight', orderItemId: upd.orderItemId });
+    }
+
+    // Validate max variation (if configured on product)
+    if (!isAdmin) {
+      const productId = oi.product_id as string;
+      let maxVar = maxVarByProductId.get(productId);
+      if (maxVar === undefined) {
+        const { data: prod } = await supabaseService
+          .from('products')
+          .select('max_weight_variation_pct')
+          .eq('id', productId)
+          .single();
+        maxVar = Number(prod?.max_weight_variation_pct ?? 0);
+        maxVarByProductId.set(productId, maxVar);
+      }
+
+      if (maxVar && maxVar > 0) {
+        const allowedDelta = estimated * (maxVar / 100);
+        if (Math.abs(actual - estimated) > allowedDelta + 0.0001) {
+          return res.status(400).json({
+            error: 'weight_variation_exceeds_limit',
+            orderItemId: upd.orderItemId,
+            estimated,
+            actual,
+            maxVariationPct: maxVar,
+          });
+        }
+      }
     }
 
     const unitPriceCentsPerKg = Number(oi.unit_price_cents_snapshot);
@@ -769,6 +936,11 @@ async function ensureStripeCustomer(buyerId: string, email?: string): Promise<st
       .eq('id', buyerId);
   }
 
+  // At this point it must exist.
+  if (!stripeCustomerId) {
+    throw new Error('stripe_customer_id_missing');
+  }
+
   return stripeCustomerId;
 }
 
@@ -809,6 +981,17 @@ async function applyWalletTopup(buyerId: string, paymentIntent: any): Promise<vo
 }
 
 async function markOrderPaidAndNotify(orderId: string, paymentIntent: any): Promise<void> {
+  // Idempotency: Stripe can retry webhooks.
+  const { data: current } = await supabaseService
+    .from('orders')
+    .select('id,payment_status')
+    .eq('id', orderId)
+    .single();
+
+  if (current?.payment_status === 'succeeded') {
+    return;
+  }
+
   const chargeId = paymentIntent.latest_charge ?? (paymentIntent.charges?.data?.[0]?.id ?? null);
 
   const { data: order, error } = await supabaseService
@@ -829,14 +1012,32 @@ async function markOrderPaidAndNotify(orderId: string, paymentIntent: any): Prom
     return;
   }
 
-  // Risk reserve is platform-owned; no seller reserve ledger.
-
   // Fetch seller + items + buyer profile
   const [{ data: seller }, { data: items }, { data: buyerProfile }] = await Promise.all([
     supabaseService.from('sellers').select('*').eq('id', order.seller_id).single(),
     supabaseService.from('order_items').select('*').eq('order_id', order.id),
     supabaseService.from('profiles').select('*').eq('id', order.buyer_id).single(),
   ]);
+
+  // Create rolling reserve ledger entry (held, then released later).
+  // We do this after the order is marked paid, so we only track paid orders.
+  if (order.risk_reserve_cents && order.risk_reserve_cents > 0) {
+    const days = Number(seller?.risk_reserve_days ?? 60);
+    const releaseAt = DateTime.now().plus({ days }).toISO();
+
+    // Upsert to be safe with webhook retries/concurrency.
+    await supabaseService.from('seller_reserves').upsert(
+      {
+        seller_id: order.seller_id,
+        order_id: order.id,
+        amount_cents: order.risk_reserve_cents,
+        currency: order.currency ?? 'brl',
+        status: 'held',
+        release_at: releaseAt,
+      },
+      { onConflict: 'order_id' }
+    );
+  }
 
   if (!seller?.order_email) {
     console.warn('Seller order_email missing. Skipping email.');
