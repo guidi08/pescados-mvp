@@ -91,7 +91,7 @@ def main():
         return
 
     # only send between 06:30 and 14:30 (Miami)
-    if now.hour == 6 and now.minute < 30:
+    if (now.hour == 6 and now.minute < 30) or (now.hour > 14) or (now.hour == 14 and now.minute > 30):
         return
 
     titles = get_sheet_titles()
