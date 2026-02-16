@@ -14,17 +14,20 @@ export default function NewProductPage() {
   const [sellerId, setSellerId] = useState<string | null>(null);
 
   const [name, setName] = useState('');
+  const [namePreset, setNamePreset] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
 
-  const [unit, setUnit] = useState('kg');
-  const [pricingMode, setPricingMode] = useState<'per_unit' | 'per_kg_box'>('per_unit');
+  const unit = 'cx';
+  const [pricingMode, setPricingMode] = useState<'variable' | 'fixed'>('variable');
 
   const [estimatedBoxWeightKg, setEstimatedBoxWeightKg] = useState('30');
-  const [maxVarPct, setMaxVarPct] = useState('10');
+  const [maxVarPct, setMaxVarPct] = useState('12');
 
   const [fresh, setFresh] = useState(false);
-  const [minExpiry, setMinExpiry] = useState<string>('');
+  const [freshExpiryDays, setFreshExpiryDays] = useState('');
+  const [frozenExpiryMonth, setFrozenExpiryMonth] = useState('');
+  const [frozenExpiryDate, setFrozenExpiryDate] = useState('');
 
   const [price, setPrice] = useState('0.00');
 
@@ -52,41 +55,63 @@ export default function NewProductPage() {
     })();
   }, []);
 
+  function formatDate(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function computeMinExpiryDate(): string | null {
+    if (fresh) {
+      const days = Number(freshExpiryDays);
+      if (!Number.isFinite(days) || days <= 0) return null;
+      const d = new Date();
+      d.setDate(d.getDate() + Math.round(days));
+      return formatDate(d);
+    }
+
+    if (frozenExpiryDate) return frozenExpiryDate;
+
+    if (!frozenExpiryMonth) return null;
+    const [y, m] = frozenExpiryMonth.split('-').map(Number);
+    if (!y || !m) return null;
+    // last day of month
+    const d = new Date(y, m, 0);
+    return formatDate(d);
+  }
+
   async function create() {
     if (!sellerId) return;
     setMsg(null);
 
-    if (!name.trim()) {
+    const finalName = (namePreset === '__custom__' ? name : namePreset).trim();
+
+    if (!finalName) {
       setMsg('Informe o nome do produto.');
       return;
     }
 
-    if (pricingMode === 'per_kg_box' && unit !== 'cx') {
-      // convenience: when per_kg_box, we strongly recommend unit=cx
-      setUnit('cx');
-    }
-
     const payload: any = {
       seller_id: sellerId,
-      name: name.trim(),
+      name: finalName,
       description: description.trim() || null,
       category: category.trim() || null,
-      unit: unit.trim() || 'kg',
-      pricing_mode: pricingMode,
+      unit,
+      pricing_mode: 'per_kg_box',
       fresh,
-      min_expiry_date: minExpiry || null,
+      min_expiry_date: computeMinExpiryDate(),
       base_price_cents: brlToCents(price),
       active: true,
       currency: 'brl',
     };
 
-    if (pricingMode === 'per_kg_box') {
-      payload.estimated_box_weight_kg = Number(estimatedBoxWeightKg.replace(',', '.')) || 30;
-      payload.max_weight_variation_pct = Number(maxVarPct.replace(',', '.')) || 0;
-    } else {
-      payload.estimated_box_weight_kg = null;
-      payload.max_weight_variation_pct = 0;
-    }
+    payload.estimated_box_weight_kg = Number(estimatedBoxWeightKg.replace(',', '.')) || 30;
+    payload.max_weight_variation_pct = fresh
+      ? 12
+      : (pricingMode === 'fixed'
+        ? 0
+        : (Number(maxVarPct.replace(',', '.')) || 0));
 
     const { error } = await supabase.from('products').insert(payload);
     if (error) {
@@ -121,12 +146,66 @@ export default function NewProductPage() {
         <div className="row">
           <div style={{ flex: 1 }}>
             <label className="label">Nome</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            <select
+              className="input"
+              value={namePreset}
+              onChange={(e) => {
+                setNamePreset(e.target.value);
+                if (e.target.value !== '__custom__') setName('');
+              }}
+            >
+              <option value="">Selecione...</option>
+              <option value="Salmão inteiro Fresco 6/8">Salmão inteiro Fresco 6/8</option>
+              <option value="Salmão inteiro Fresco 8/10">Salmão inteiro Fresco 8/10</option>
+              <option value="Salmão inteiro Fresco 10/12">Salmão inteiro Fresco 10/12</option>
+              <option value="Salmão inteiro Fresco 12/14">Salmão inteiro Fresco 12/14</option>
+              <option value="Salmão Inteiro Fresco 14/16">Salmão Inteiro Fresco 14/16</option>
+              <option value="Salmão Inteiro Fresco 16/18">Salmão Inteiro Fresco 16/18</option>
+              <option value="Salmão Inteiro Fresco 18/20">Salmão Inteiro Fresco 18/20</option>
+              <option value="Salmão Inteiro Fresco 20/up">Salmão Inteiro Fresco 20/up</option>
+              <option value="Filé de Saint Peter Fresco">Filé de Saint Peter Fresco</option>
+              <option value="Filé de Saint Peter">Filé de Saint Peter</option>
+              <option value="Filé de Salmão 800/1200">Filé de Salmão 800/1200</option>
+              <option value="Filé de Salmão 1200/1500">Filé de Salmão 1200/1500</option>
+              <option value="Filé de Salmão 1500/2000">Filé de Salmão 1500/2000</option>
+              <option value="Filé de Salmão 2000/2500">Filé de Salmão 2000/2500</option>
+              <option value="Filé de Salmão 3000 acima">Filé de Salmão 3000 acima</option>
+              <option value="Centolla 1kg">Centolla 1kg</option>
+              <option value="Centolla 1 a 1,2kg">Centolla 1 a 1,2kg</option>
+              <option value="Centolla 1,2 a 1,4kg">Centolla 1,2 a 1,4kg</option>
+              <option value="Centolla 1,4 a 1,6kg">Centolla 1,4 a 1,6kg</option>
+              <option value="Centolla 1,6 a 1,8kg">Centolla 1,6 a 1,8kg</option>
+              <option value="Centolla 1,8 a 2kg">Centolla 1,8 a 2kg</option>
+              <option value="Centolla 2 a 2,2kg">Centolla 2 a 2,2kg</option>
+              <option value="Centolla 2,2 a 2,4kg">Centolla 2,2 a 2,4kg</option>
+              <option value="Centolla 2,4kg acima">Centolla 2,4kg acima</option>
+              <option value="Polvo 500g abaixo">Polvo 500g abaixo</option>
+              <option value="Polvo 500g a 1kg">Polvo 500g a 1kg</option>
+              <option value="Polvo 1 a 1,5kg">Polvo 1 a 1,5kg</option>
+              <option value="Polvo 1.5 a 2kg">Polvo 1.5 a 2kg</option>
+              <option value="Polvo 2 a 2,5kg">Polvo 2 a 2,5kg</option>
+              <option value="Polvo 2,5 a 3kg">Polvo 2,5 a 3kg</option>
+              <option value="__custom__">Outro (digitar)</option>
+            </select>
+            {namePreset === '__custom__' && (
+              <input
+                className="input"
+                style={{ marginTop: 8 }}
+                placeholder="Digite o nome"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
           </div>
 
           <div style={{ width: 260 }}>
             <label className="label">Categoria</label>
-            <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex: Salmão, Camarão..." />
+            <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">Selecione...</option>
+              <option value="Pescados">Pescados</option>
+              <option value="Frutos do Mar">Frutos do Mar</option>
+              <option value="Iguarias">Iguarias</option>
+            </select>
           </div>
         </div>
 
@@ -139,52 +218,88 @@ export default function NewProductPage() {
           <div>
             <label className="label">Modo de precificação</label>
             <select className="input" value={pricingMode} onChange={(e) => setPricingMode(e.target.value as any)}>
-              <option value="per_unit">Por unidade (kg/cx/un)</option>
-              <option value="per_kg_box">Por kg, vendido por caixa (peso variável)</option>
+              <option value="variable">Por kg, vendido por caixa de peso variável</option>
+              <option value="fixed">Por kg com caixa de peso fixo</option>
             </select>
-            <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-              * Use <strong>per_kg_box</strong> para salmão por caixa (30kg estimado).
-            </div>
           </div>
 
           <div>
             <label className="label">Unidade (para o pedido)</label>
-            <input className="input" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="kg / cx / un" />
+            <input className="input" value={unit} disabled />
           </div>
 
           <div>
             <label className="label">Fresco</label>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
-              <input type="checkbox" checked={fresh} onChange={(e) => setFresh(e.target.checked)} />
+              <input type="checkbox" checked={fresh} onChange={(e) => {
+                setFresh(e.target.checked);
+                setFreshExpiryDays('');
+                setFrozenExpiryMonth('');
+                setFrozenExpiryDate('');
+              }} />
               Sim (produto fresco)
             </label>
+            {fresh && (
+              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+                Produtos frescos: variação de caixa fixada entre 10–12% (ajustamos manualmente se o tamanho for muito grande).
+              </div>
+            )}
           </div>
         </div>
 
-        {pricingMode === 'per_kg_box' ? (
-          <div className="row" style={{ marginTop: 12 }}>
-            <div>
-              <label className="label">Peso estimado (kg por caixa)</label>
-              <input className="input" value={estimatedBoxWeightKg} onChange={(e) => setEstimatedBoxWeightKg(e.target.value)} />
-            </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <div>
+            <label className="label">Peso estimado (kg por caixa)</label>
+            <input className="input" value={estimatedBoxWeightKg} onChange={(e) => setEstimatedBoxWeightKg(e.target.value)} />
+          </div>
+          {pricingMode === 'variable' && !fresh && (
             <div>
               <label className="label">Variação máxima (%)</label>
               <input className="input" value={maxVarPct} onChange={(e) => setMaxVarPct(e.target.value)} />
             </div>
-          </div>
-        ) : null}
+          )}
+        </div>
 
         <div className="row" style={{ marginTop: 12 }}>
           <div>
-            <label className="label">Validade mínima (lote)</label>
-            <input className="input" type="date" value={minExpiry} onChange={(e) => setMinExpiry(e.target.value)} />
+            <label className="label">Validade mínima</label>
+            {fresh ? (
+              <input
+                className="input"
+                type="number"
+                min="1"
+                placeholder="Dias"
+                value={freshExpiryDays}
+                onChange={(e) => setFreshExpiryDays(e.target.value)}
+              />
+            ) : (
+              <>
+                <input
+                  className="input"
+                  type="month"
+                  value={frozenExpiryMonth}
+                  onChange={(e) => setFrozenExpiryMonth(e.target.value)}
+                />
+                <input
+                  className="input"
+                  type="date"
+                  style={{ marginTop: 8 }}
+                  value={frozenExpiryDate}
+                  onChange={(e) => setFrozenExpiryDate(e.target.value)}
+                  placeholder="Data completa (opcional)"
+                />
+              </>
+            )}
+            <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+              {fresh ? 'Informe quantidade de dias (opcional)' : 'Selecione mês/ano ou data completa (opcional)'}
+            </div>
           </div>
 
           <div>
             <label className="label">Preço</label>
             <input className="input" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
             <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-              {pricingMode === 'per_kg_box' ? 'Preço por kg (venda por caixa)' : `Preço por ${unit}`}
+              Preço por kg (venda por caixa)
             </div>
           </div>
         </div>
