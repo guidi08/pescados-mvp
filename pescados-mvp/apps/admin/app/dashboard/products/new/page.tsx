@@ -14,6 +14,7 @@ export default function NewProductPage() {
   const [sellerId, setSellerId] = useState<string | null>(null);
 
   const [name, setName] = useState('');
+  const [namePreset, setNamePreset] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
 
@@ -26,6 +27,7 @@ export default function NewProductPage() {
   const [fresh, setFresh] = useState(false);
   const [freshExpiryDays, setFreshExpiryDays] = useState('');
   const [frozenExpiryMonth, setFrozenExpiryMonth] = useState('');
+  const [frozenExpiryDate, setFrozenExpiryDate] = useState('');
 
   const [price, setPrice] = useState('0.00');
 
@@ -69,6 +71,8 @@ export default function NewProductPage() {
       return formatDate(d);
     }
 
+    if (frozenExpiryDate) return frozenExpiryDate;
+
     if (!frozenExpiryMonth) return null;
     const [y, m] = frozenExpiryMonth.split('-').map(Number);
     if (!y || !m) return null;
@@ -81,14 +85,16 @@ export default function NewProductPage() {
     if (!sellerId) return;
     setMsg(null);
 
-    if (!name.trim()) {
+    const finalName = (namePreset === '__custom__' ? name : namePreset).trim();
+
+    if (!finalName) {
       setMsg('Informe o nome do produto.');
       return;
     }
 
     const payload: any = {
       seller_id: sellerId,
-      name: name.trim(),
+      name: finalName,
       description: description.trim() || null,
       category: category.trim() || null,
       unit,
@@ -138,7 +144,56 @@ export default function NewProductPage() {
         <div className="row">
           <div style={{ flex: 1 }}>
             <label className="label">Nome</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            <select
+              className="input"
+              value={namePreset}
+              onChange={(e) => {
+                setNamePreset(e.target.value);
+                if (e.target.value !== '__custom__') setName('');
+              }}
+            >
+              <option value="">Selecione...</option>
+              <option value="Salmão inteiro Fresco 6/8">Salmão inteiro Fresco 6/8</option>
+              <option value="Salmão inteiro Fresco 8/10">Salmão inteiro Fresco 8/10</option>
+              <option value="Salmão inteiro Fresco 10/12">Salmão inteiro Fresco 10/12</option>
+              <option value="Salmão inteiro Fresco 12/14">Salmão inteiro Fresco 12/14</option>
+              <option value="Salmão Inteiro Fresco 14/16">Salmão Inteiro Fresco 14/16</option>
+              <option value="Salmão Inteiro Fresco 16/18">Salmão Inteiro Fresco 16/18</option>
+              <option value="Salmão Inteiro Fresco 18/20">Salmão Inteiro Fresco 18/20</option>
+              <option value="Salmão Inteiro Fresco 20/up">Salmão Inteiro Fresco 20/up</option>
+              <option value="Filé de Saint Peter Fresco">Filé de Saint Peter Fresco</option>
+              <option value="Filé de Saint Peter">Filé de Saint Peter</option>
+              <option value="Filé de Salmão 800/1200">Filé de Salmão 800/1200</option>
+              <option value="Filé de Salmão 1200/1500">Filé de Salmão 1200/1500</option>
+              <option value="Filé de Salmão 1500/2000">Filé de Salmão 1500/2000</option>
+              <option value="Filé de Salmão 2000/2500">Filé de Salmão 2000/2500</option>
+              <option value="Filé de Salmão 3000 acima">Filé de Salmão 3000 acima</option>
+              <option value="Centolla 1kg">Centolla 1kg</option>
+              <option value="Centolla 1 a 1,2kg">Centolla 1 a 1,2kg</option>
+              <option value="Centolla 1,2 a 1,4kg">Centolla 1,2 a 1,4kg</option>
+              <option value="Centolla 1,4 a 1,6kg">Centolla 1,4 a 1,6kg</option>
+              <option value="Centolla 1,6 a 1,8kg">Centolla 1,6 a 1,8kg</option>
+              <option value="Centolla 1,8 a 2kg">Centolla 1,8 a 2kg</option>
+              <option value="Centolla 2 a 2,2kg">Centolla 2 a 2,2kg</option>
+              <option value="Centolla 2,2 a 2,4kg">Centolla 2,2 a 2,4kg</option>
+              <option value="Centolla 2,4kg acima">Centolla 2,4kg acima</option>
+              <option value="Polvo 500g abaixo">Polvo 500g abaixo</option>
+              <option value="Polvo 500g a 1kg">Polvo 500g a 1kg</option>
+              <option value="Polvo 1 a 1,5kg">Polvo 1 a 1,5kg</option>
+              <option value="Polvo 1.5 a 2kg">Polvo 1.5 a 2kg</option>
+              <option value="Polvo 2 a 2,5kg">Polvo 2 a 2,5kg</option>
+              <option value="Polvo 2,5 a 3kg">Polvo 2,5 a 3kg</option>
+              <option value="__custom__">Outro (digitar)</option>
+            </select>
+            {namePreset === '__custom__' && (
+              <input
+                className="input"
+                style={{ marginTop: 8 }}
+                placeholder="Digite o nome"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
           </div>
 
           <div style={{ width: 260 }}>
@@ -178,6 +233,7 @@ export default function NewProductPage() {
                 setFresh(e.target.checked);
                 setFreshExpiryDays('');
                 setFrozenExpiryMonth('');
+                setFrozenExpiryDate('');
               }} />
               Sim (produto fresco)
             </label>
@@ -210,15 +266,25 @@ export default function NewProductPage() {
                 onChange={(e) => setFreshExpiryDays(e.target.value)}
               />
             ) : (
-              <input
-                className="input"
-                type="month"
-                value={frozenExpiryMonth}
-                onChange={(e) => setFrozenExpiryMonth(e.target.value)}
-              />
+              <>
+                <input
+                  className="input"
+                  type="month"
+                  value={frozenExpiryMonth}
+                  onChange={(e) => setFrozenExpiryMonth(e.target.value)}
+                />
+                <input
+                  className="input"
+                  type="date"
+                  style={{ marginTop: 8 }}
+                  value={frozenExpiryDate}
+                  onChange={(e) => setFrozenExpiryDate(e.target.value)}
+                  placeholder="Data completa (opcional)"
+                />
+              </>
             )}
             <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-              {fresh ? 'Informe quantidade de dias (opcional)' : 'Selecione mês e ano (opcional)'}
+              {fresh ? 'Informe quantidade de dias (opcional)' : 'Selecione mês/ano ou data completa (opcional)'}
             </div>
           </div>
 
