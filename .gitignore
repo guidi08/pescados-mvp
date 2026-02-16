@@ -6,3 +6,4 @@ dist
 .expo
 .expo-shared
 *.log
+credentials/
