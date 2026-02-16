@@ -20,9 +20,6 @@ type Seller = {
   min_order_cents: number;
   b2c_enabled: boolean;
 
-  risk_reserve_bps: number;
-  risk_reserve_days: number;
-
   stripe_account_id: string | null;
   stripe_account_charges_enabled: boolean;
   stripe_account_payouts_enabled: boolean;
@@ -280,24 +277,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="row" style={{ marginTop: 12 }}>
-            <div>
-              <label className="label">Reserva de risco (% do subtotal)</label>
-              <input
-                className="input"
-                type="number"
-                step="0.01"
-                value={(seller.risk_reserve_bps / 100).toFixed(2)}
-                onChange={(e) => {
-                  const pct = Number(e.target.value);
-                  if (!Number.isFinite(pct)) return;
-                  setSeller({ ...seller, risk_reserve_bps: Math.round(pct * 100) });
-                }}
-              />
-              <div style={{ color: '#666', fontSize: 12 }}>
-                Período: {seller.risk_reserve_days} dias
-              </div>
-            </div>
-
             <div style={{ flex: 1 }}>
               <label className="label">Recebimentos (Stripe)</label>
               <div className="row" style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -331,7 +310,6 @@ export default function DashboardPage() {
               shipping_fee_cents: seller.shipping_fee_cents,
               min_order_cents: seller.min_order_cents,
               b2c_enabled: seller.b2c_enabled,
-              risk_reserve_bps: seller.risk_reserve_bps,
             })}>
               Salvar
             </button>
