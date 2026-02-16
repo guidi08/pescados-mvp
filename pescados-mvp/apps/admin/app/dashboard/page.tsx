@@ -373,88 +373,90 @@ export default function DashboardPage() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <h2>Produtos</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Produto</th>
-              <th>Tipo</th>
-              <th>Validade mínima</th>
-              <th>Preço base</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <div><strong>{p.name}</strong></div>
-                  <div style={{ color: '#666', fontSize: 12 }}>
-                    {p.unit} • {p.pricing_mode === 'per_kg_box' ? 'por caixa (peso variável)' : 'por unidade'} • atualizado {new Date(p.updated_at).toLocaleString('pt-BR')}
-                  </div>
-                </td>
-                <td>
-                  <span className={`badge ${p.fresh ? 'green' : 'gray'}`}>{p.fresh ? 'Fresco' : 'Congelado'}</span>
-                  <div style={{ marginTop: 6 }}>
-                    <label style={{ fontSize: 12 }}>
-                      <input
-                        type="checkbox"
-                        checked={p.fresh}
-                        onChange={(e) => updateProduct(p.id, { fresh: e.target.checked })}
-                      />{' '}
-                      Fresco
-                    </label>
-                  </div>
-                </td>
-                <td>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 160 }}
-                    type="date"
-                    value={p.min_expiry_date ?? ''}
-                    onChange={(e) => updateProduct(p.id, { min_expiry_date: e.target.value || null })}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 140 }}
-                    type="number"
-                    step="0.01"
-                    value={(p.base_price_cents / 100).toFixed(2)}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (Number.isFinite(v)) updateProduct(p.id, { base_price_cents: Math.round(v * 100) });
-                    }}
-                  />
-                  <div style={{ color: '#666', fontSize: 12 }}>
-                    {centsToBRL(p.base_price_cents)} / {p.pricing_mode === 'per_kg_box' ? 'kg' : p.unit}
-                    {p.pricing_mode === 'per_kg_box' && p.estimated_box_weight_kg ? ` • ~${p.estimated_box_weight_kg}kg/cx` : ''}
-                  </div>
-                </td>
-                <td>
-                  <span className={`badge ${p.active ? 'green' : 'gray'}`}>{p.active ? 'Ativo' : 'Pausado'}</span>
-                </td>
-                <td>
-                  <button className="btn secondary" onClick={() => updateProduct(p.id, { active: !p.active })}>
-                    {p.active ? 'Pausar' : 'Reativar'}
-                  </button>
-                  <span style={{ marginLeft: 8 }} />
-                  <button className="btn secondary" onClick={() => (window.location.href = `/dashboard/products/${p.id}`)}>
-                    Variantes
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!products.length && (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={6} style={{ color: '#666' }}>
-                  Nenhum produto cadastrado.
-                </td>
+                <th>Produto</th>
+                <th>Tipo</th>
+                <th>Validade mínima</th>
+                <th>Preço base</th>
+                <th>Status</th>
+                <th>Ações</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <div><strong>{p.name}</strong></div>
+                    <div style={{ color: '#666', fontSize: 12 }}>
+                      {p.unit} • {p.pricing_mode === 'per_kg_box' ? 'por caixa (peso variável)' : 'por unidade'} • atualizado {new Date(p.updated_at).toLocaleString('pt-BR')}
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`badge ${p.fresh ? 'green' : 'gray'}`}>{p.fresh ? 'Fresco' : 'Congelado'}</span>
+                    <div style={{ marginTop: 6 }}>
+                      <label style={{ fontSize: 12 }}>
+                        <input
+                          type="checkbox"
+                          checked={p.fresh}
+                          onChange={(e) => updateProduct(p.id, { fresh: e.target.checked })}
+                        />{' '}
+                        Fresco
+                      </label>
+                    </div>
+                  </td>
+                  <td>
+                    <input
+                      className="input"
+                      style={{ maxWidth: 160 }}
+                      type="date"
+                      value={p.min_expiry_date ?? ''}
+                      onChange={(e) => updateProduct(p.id, { min_expiry_date: e.target.value || null })}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="input"
+                      style={{ maxWidth: 140 }}
+                      type="number"
+                      step="0.01"
+                      value={(p.base_price_cents / 100).toFixed(2)}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (Number.isFinite(v)) updateProduct(p.id, { base_price_cents: Math.round(v * 100) });
+                      }}
+                    />
+                    <div style={{ color: '#666', fontSize: 12 }}>
+                      {centsToBRL(p.base_price_cents)} / {p.pricing_mode === 'per_kg_box' ? 'kg' : p.unit}
+                      {p.pricing_mode === 'per_kg_box' && p.estimated_box_weight_kg ? ` • ~${p.estimated_box_weight_kg}kg/cx` : ''}
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`badge ${p.active ? 'green' : 'gray'}`}>{p.active ? 'Ativo' : 'Pausado'}</span>
+                  </td>
+                  <td>
+                    <button className="btn secondary" onClick={() => updateProduct(p.id, { active: !p.active })}>
+                      {p.active ? 'Pausar' : 'Reativar'}
+                    </button>
+                    <span style={{ marginLeft: 8 }} />
+                    <button className="btn secondary" onClick={() => (window.location.href = `/dashboard/products/${p.id}`)}>
+                      Variantes
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!products.length && (
+                <tr>
+                  <td colSpan={6} style={{ color: '#666' }}>
+                    Nenhum produto cadastrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
