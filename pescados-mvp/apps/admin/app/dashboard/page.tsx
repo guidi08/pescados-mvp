@@ -388,13 +388,13 @@ export default function DashboardPage() {
             <tbody>
               {products.map((p) => (
                 <tr key={p.id}>
-                  <td>
+                  <td data-label="Produto">
                     <div><strong>{p.name}</strong></div>
                     <div style={{ color: '#666', fontSize: 12 }}>
                       {p.unit} • {p.pricing_mode === 'per_kg_box' ? 'por caixa (peso variável)' : 'por unidade'} • atualizado {new Date(p.updated_at).toLocaleString('pt-BR')}
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Tipo">
                     <span className={`badge ${p.fresh ? 'green' : 'gray'}`}>{p.fresh ? 'Fresco' : 'Congelado'}</span>
                     <div style={{ marginTop: 6 }}>
                       <label style={{ fontSize: 12 }}>
@@ -407,7 +407,7 @@ export default function DashboardPage() {
                       </label>
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Validade mínima">
                     <input
                       className="input"
                       style={{ maxWidth: 160 }}
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                       onChange={(e) => updateProduct(p.id, { min_expiry_date: e.target.value || null })}
                     />
                   </td>
-                  <td>
+                  <td data-label="Preço base">
                     <input
                       className="input"
                       style={{ maxWidth: 140 }}
@@ -433,10 +433,10 @@ export default function DashboardPage() {
                       {p.pricing_mode === 'per_kg_box' && p.estimated_box_weight_kg ? ` • ~${p.estimated_box_weight_kg}kg/cx` : ''}
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <span className={`badge ${p.active ? 'green' : 'gray'}`}>{p.active ? 'Ativo' : 'Pausado'}</span>
                   </td>
-                  <td>
+                  <td data-label="Ações">
                     <button className="btn secondary" onClick={() => updateProduct(p.id, { active: !p.active })}>
                       {p.active ? 'Pausar' : 'Reativar'}
                     </button>
