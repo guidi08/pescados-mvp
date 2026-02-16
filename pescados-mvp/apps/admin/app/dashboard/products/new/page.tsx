@@ -22,7 +22,7 @@ export default function NewProductPage() {
   const [pricingMode, setPricingMode] = useState<'variable' | 'fixed'>('variable');
 
   const [estimatedBoxWeightKg, setEstimatedBoxWeightKg] = useState('30');
-  const [maxVarPct, setMaxVarPct] = useState('10');
+  const [maxVarPct, setMaxVarPct] = useState('12');
 
   const [fresh, setFresh] = useState(false);
   const [freshExpiryDays, setFreshExpiryDays] = useState('');
@@ -107,9 +107,11 @@ export default function NewProductPage() {
     };
 
     payload.estimated_box_weight_kg = Number(estimatedBoxWeightKg.replace(',', '.')) || 30;
-    payload.max_weight_variation_pct = pricingMode === 'fixed'
-      ? 0
-      : (Number(maxVarPct.replace(',', '.')) || 0);
+    payload.max_weight_variation_pct = fresh
+      ? 12
+      : (pricingMode === 'fixed'
+        ? 0
+        : (Number(maxVarPct.replace(',', '.')) || 0));
 
     const { error } = await supabase.from('products').insert(payload);
     if (error) {
@@ -237,6 +239,11 @@ export default function NewProductPage() {
               }} />
               Sim (produto fresco)
             </label>
+            {fresh && (
+              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+                Produtos frescos: variação de caixa fixada entre 10–12% (ajustamos manualmente se o tamanho for muito grande).
+              </div>
+            )}
           </div>
         </div>
 
@@ -245,7 +252,7 @@ export default function NewProductPage() {
             <label className="label">Peso estimado (kg por caixa)</label>
             <input className="input" value={estimatedBoxWeightKg} onChange={(e) => setEstimatedBoxWeightKg(e.target.value)} />
           </div>
-          {pricingMode === 'variable' && (
+          {pricingMode === 'variable' && !fresh && (
             <div>
               <label className="label">Variação máxima (%)</label>
               <input className="input" value={maxVarPct} onChange={(e) => setMaxVarPct(e.target.value)} />
