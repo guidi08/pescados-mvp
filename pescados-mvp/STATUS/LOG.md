@@ -54,7 +54,7 @@
 1) Railway crash pós-deploy:
    - Causa: variáveis STRIPE_* não configuradas, validação obrigatória no backend.
    - Correção temporária: placeholders (mantém online, mas precisa chave real antes de produção).
-   - Ação definitiva: inserir STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY e STRIPE_WEBHOOK_SECRET reais.
+   - Ação definitiva: inserir STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY e STRIPE_WEBHOOK_SECRET reais. (FEITO em 2026-02-16 no Railway prod)
 
 2) Build falhando no Railway:
    - Causa: falta @types/nodemailer e @types/luxon.
