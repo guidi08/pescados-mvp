@@ -71,7 +71,7 @@ export default function CheckoutScreen({ navigation }: any) {
       const ps = await createPaymentSheet(order.orderId);
 
       const initRes = await initPaymentSheet({
-        merchantDisplayName: 'Pescados Marketplace',
+        merchantDisplayName: 'LotePro',
         customerId: ps.customerId,
         customerEphemeralKeySecret: ps.customerEphemeralKeySecret,
         paymentIntentClientSecret: ps.paymentIntentClientSecret,

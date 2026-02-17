@@ -142,7 +142,6 @@ export default function ProductScreen({ route, navigation }: Props) {
     });
 
     Alert.alert('Adicionado', 'Item adicionado ao carrinho.');
-    navigation.navigate('Cart');
   }
 
   if (!product) {
@@ -232,7 +231,6 @@ export default function ProductScreen({ route, navigation }: Props) {
 
         <View style={{ gap: spacing['2'] }}>
           <Button title="Adicionar ao carrinho" onPress={onAddToCart} />
-          <Button title="Voltar" onPress={() => navigation.goBack()} variant="secondary" />
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -372,7 +372,7 @@ app.post('/payments/stripe/payment-sheet', requireAuth, async (req: AuthedReques
       risk_reserve_cents: String(order.risk_reserve_cents),
       seller_payout_cents: String(order.seller_payout_cents),
     },
-    description: `Pedido ${order.id} - Pescados Marketplace`,
+    description: `Pedido ${order.id} - LotePro`,
     application_fee_amount: order.platform_fee_cents,
     transfer_data: {
       destination: seller.stripe_account_id,
@@ -425,7 +425,7 @@ app.post('/payments/stripe/pix', requireAuth, async (req: AuthedRequest, res) =>
       risk_reserve_cents: String(order.risk_reserve_cents),
       seller_payout_cents: String(order.seller_payout_cents),
     },
-    description: `Pedido ${order.id} - Pescados Marketplace (Pix)`,
+    description: `Pedido ${order.id} - LotePro (Pix)`,
     receipt_email: req.user!.email ?? undefined,
     payment_method_options: {
       pix: {

@@ -1,115 +1,129 @@
-import React, { useEffect, useState } from 'react';
-import { FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { supabase } from '../supabaseClient';
-import { RootStackParamList } from '../../App';
-import { useCart } from '../context/CartContext';
-import Button from '../components/Button';
-import Card from '../components/Card';
-import { colors, spacing, textStyle } from '../theme';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FlatList, SafeAreaView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+import { supabase } from '../supabaseClient';
+import { useBuyer } from '../context/BuyerContext';
+import Card from '../components/Card';
+import Badge from '../components/Badge';
+import { colors, spacing, textStyle } from '../theme';
 
 type Seller = {
   id: string;
   display_name: string;
-  city: string | null;
-  state: string | null;
-  cutoff_time: string;
+  city: string;
+  state: string;
   active: boolean;
-  b2c_enabled?: boolean;
+  cutoff_time: string;
+  min_order_cents: number;
+  shipping_fee_cents: number;
+  b2c_enabled: boolean;
 };
 
-export default function HomeScreen({ navigation }: Props) {
+function centsToBRL(cents: number): string {
+  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+export default function HomeScreen() {
+  const navigation = useNavigation<any>();
+  const { channel } = useBuyer();
+
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
-  const [buyerChannel, setBuyerChannel] = useState<'b2b' | 'b2c'>('b2c');
-  const { items } = useCart();
+  const [query, setQuery] = useState('');
 
   async function load() {
     setLoading(true);
 
-    // Determine channel (B2B if profile has CNPJ)
-    let channel: 'b2b' | 'b2c' = 'b2c';
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    if (userId) {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('cnpj')
-        .eq('id', userId)
-        .single();
-      channel = prof?.cnpj ? 'b2b' : 'b2c';
-      setBuyerChannel(channel);
-    }
-
     const { data, error } = await supabase
       .from('sellers')
-      .select('id, display_name, city, state, cutoff_time, active, b2c_enabled')
+      .select('id, display_name, city, state, active, cutoff_time, min_order_cents, shipping_fee_cents, b2c_enabled')
       .eq('active', true)
       .order('display_name', { ascending: true });
 
     if (!error) {
       const list = (data ?? []) as any as Seller[];
-      // B2C: only sellers with b2c_enabled
-      const filtered = channel === 'b2c' ? list.filter((s) => !!s.b2c_enabled) : list;
-      setSellers(filtered);
+      setSellers(channel === 'b2c' ? list.filter((s) => s.b2c_enabled) : list);
     }
+
     setLoading(false);
   }
 
   useEffect(() => {
     load();
-    const channel = supabase
-      .channel('realtime-sellers')
+
+    const channelRealtime = supabase
+      .channel('realtime-sellers-mobile')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sellers' }, () => load())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channelRealtime);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel]);
 
-  async function logout() {
-    await supabase.auth.signOut();
-  }
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sellers;
+    return sellers.filter((s) => `${s.display_name} ${s.city} ${s.state}`.toLowerCase().includes(q));
+  }, [sellers, query]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
       <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
         <Text style={textStyle('h1')}>Fornecedores</Text>
-        <Text style={[textStyle('small'), { color: colors.text.secondary }]}
-        >Canal: {buyerChannel === 'b2b' ? 'B2B (CNPJ)' : 'B2C (CPF)'}</Text>
 
-        <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
-          <Button title={`Carrinho (${items.length})`} onPress={() => navigation.navigate('Cart')} size="sm" />
-          <Button title="Meus pedidos" onPress={() => navigation.navigate('Orders')} size="sm" variant="secondary" />
-          {buyerChannel === 'b2b' ? (
-            <Button title="Saldo" onPress={() => navigation.navigate('Wallet')} size="sm" variant="secondary" />
-          ) : null}
-          <Button title="Sair" onPress={logout} size="sm" variant="ghost" />
-        </View>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Buscar fornecedor"
+          placeholderTextColor={colors.text.tertiary}
+          style={{
+            borderWidth: 1,
+            borderColor: colors.border.default,
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            backgroundColor: colors.background.surface,
+            color: colors.text.primary,
+          }}
+        />
 
         {loading ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Carregando...</Text> : null}
       </View>
 
       <FlatList
-        data={sellers}
+        data={filtered}
         keyExtractor={(s) => s.id}
-        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}
+        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'], paddingBottom: 120 }}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => navigation.navigate('Seller', { sellerId: item.id, sellerName: item.display_name })}>
             <Card>
-              <Text style={textStyle('h3')}>{item.display_name}</Text>
-              <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}
-              >
-                {item.city ? `${item.city}${item.state ? `/${item.state}` : ''}` : '—'} • Cut-off: {item.cutoff_time}
-              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, paddingRight: spacing['3'] }}>
+                  <Text style={textStyle('h3')}>{item.display_name}</Text>
+                  <Text style={[textStyle('caption'), { color: colors.text.secondary, marginTop: spacing['1'] }]}
+                  >
+                    {item.city}/{item.state}
+                  </Text>
+                </View>
+                <Badge label={channel === 'b2b' ? 'B2B' : 'B2C'} variant={channel === 'b2b' ? 'b2b' : 'b2c'} />
+              </View>
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing['2'], marginTop: spacing['2'] }}>
+                <Badge label={`Cut-off: ${item.cutoff_time}`} variant="variable" />
+                {item.min_order_cents ? <Badge label={`Mín.: ${centsToBRL(item.min_order_cents)}`} variant="variable" /> : null}
+                <Badge
+                  label={item.shipping_fee_cents ? `Frete: ${centsToBRL(item.shipping_fee_cents)}` : 'Frete: grátis'}
+                  variant="neutral"
+                />
+              </View>
             </Card>
           </TouchableOpacity>
         )}
         ListEmptyComponent={!loading ? (
-          <Text style={{ padding: spacing['4'], color: colors.text.secondary }}>Nenhum fornecedor ativo.</Text>
+          <Text style={{ padding: spacing['4'], color: colors.text.secondary }}>Nenhum fornecedor disponível.</Text>
         ) : null}
       />
     </SafeAreaView>

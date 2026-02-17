@@ -2,7 +2,7 @@ import './globals.css';
 import React from 'react';
 
 export const metadata = {
-  title: 'Portal do Fornecedor - Pescados Marketplace',
+  title: 'Portal do Fornecedor - LotePro',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

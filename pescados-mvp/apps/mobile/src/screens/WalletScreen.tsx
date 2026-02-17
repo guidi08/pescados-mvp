@@ -43,7 +43,7 @@ export default function WalletScreen({ navigation }: any) {
     try {
       const ps = await createWalletTopupPaymentSheet(amountDueCents);
       const initRes = await initPaymentSheet({
-        merchantDisplayName: 'Pescados Marketplace',
+        merchantDisplayName: 'LotePro',
         customerId: ps.customerId,
         customerEphemeralKeySecret: ps.customerEphemeralKeySecret,
         paymentIntentClientSecret: ps.paymentIntentClientSecret,

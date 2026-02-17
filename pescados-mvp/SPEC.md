@@ -1,6 +1,6 @@
-# Pescados Marketplace — MVP v2
+# LotePro — MVP
 
-Este repositório contém um MVP completo (app + portal + API + banco) para um marketplace de pescados/frutos do mar com:
+Este repositório contém um MVP completo (app + portal + API + banco) para um marketplace B2B/B2C com:
 
 - **B2B e B2C**
   - B2C apenas para fornecedores com logística (flag `sellers.b2c_enabled`).

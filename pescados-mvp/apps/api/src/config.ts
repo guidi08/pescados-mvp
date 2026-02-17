@@ -27,7 +27,7 @@ const envSchema = z.object({
   SMTP_PORT: z.string().default('587'),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().default('Pescados Marketplace <no-reply@seudominio.com.br>'),
+  SMTP_FROM: z.string().default('LotePro <no-reply@seudominio.com.br>'),
 });
 
 export const env = envSchema.parse(process.env);

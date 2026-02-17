@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+
+import { supabase } from '../supabaseClient';
 
 export type PricingMode = 'per_unit' | 'per_kg_box';
 
@@ -38,6 +40,7 @@ type CartContextValue = CartState & {
   clear: () => void;
   totalCents: number;
   subtotalCents: number;
+  shippingFeeCents: number;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -52,12 +55,36 @@ function lineTotalCents(it: CartItem): number {
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<CartState>({ sellerId: null, sellerName: null, items: [] });
+  const [shippingFeeCents, setShippingFeeCents] = useState(0);
 
   const subtotalCents = useMemo(() => {
     return state.items.reduce((acc, it) => acc + lineTotalCents(it), 0);
   }, [state.items]);
 
-  const totalCents = subtotalCents; // shipping is calculated at order creation (seller fixed fee)
+  useEffect(() => {
+    let mounted = true;
+    async function loadShipping() {
+      if (!state.sellerId) {
+        if (mounted) setShippingFeeCents(0);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('sellers')
+        .select('shipping_fee_cents')
+        .eq('id', state.sellerId)
+        .single();
+
+      if (!mounted) return;
+      setShippingFeeCents(Number((data as any)?.shipping_fee_cents ?? 0));
+    }
+    loadShipping();
+    return () => {
+      mounted = false;
+    };
+  }, [state.sellerId]);
+
+  const totalCents = subtotalCents + shippingFeeCents;
 
   function addItem(sellerId: string, sellerName: string, item: CartItem) {
     setState((prev) => {
@@ -101,7 +128,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <CartContext.Provider value={{ ...state, addItem, updateQuantity, removeItem, clear, totalCents, subtotalCents }}>
+    <CartContext.Provider value={{ ...state, addItem, updateQuantity, removeItem, clear, totalCents, subtotalCents, shippingFeeCents }}>
       {children}
     </CartContext.Provider>
   );

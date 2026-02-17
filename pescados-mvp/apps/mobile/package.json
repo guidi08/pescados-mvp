@@ -1,7 +1,7 @@
 {
-  "name": "pescados-mobile",
+  "name": "lotepro-mobile",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "expo/AppEntry",
   "scripts": {
     "start": "expo start",
@@ -10,12 +10,15 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
+    "@expo/vector-icons": "^14.0.2",
+    "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.26",
     "@stripe/stripe-react-native": "^0.40.0",
     "@supabase/supabase-js": "^2.45.4",
     "expo": "~51.0.20",
     "expo-clipboard": "~6.0.3",
+    "expo-linking": "~6.3.1",
     "expo-status-bar": "~1.12.1",
     "react": "18.3.1",
     "react-dom": "^18.2.0",

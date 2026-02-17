@@ -1,4 +1,4 @@
--- Supabase schema for Pescados Marketplace (MVP v2)
+-- Supabase schema for LotePro (MVP)
 -- Run this inside Supabase SQL editor (in order): schema.sql then rls.sql.
 -- Notes:
 -- - Uses Supabase Auth (auth.users) for users
@@ -41,9 +41,36 @@ create table if not exists public.profiles (
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, role)
-  values (new.id, new.email, 'buyer')
-  on conflict (id) do update set email = excluded.email;
+  insert into public.profiles (
+    id,
+    email,
+    role,
+    full_name,
+    phone,
+    cpf,
+    cnpj,
+    company_name
+  )
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'role', 'buyer'),
+    nullif(new.raw_user_meta_data->>'full_name', ''),
+    nullif(new.raw_user_meta_data->>'phone', ''),
+    case when (new.raw_user_meta_data->>'doc_type') = 'cpf' then nullif(new.raw_user_meta_data->>'doc_number', '') else null end,
+    case when (new.raw_user_meta_data->>'doc_type') = 'cnpj' then nullif(new.raw_user_meta_data->>'doc_number', '') else null end,
+    case when (new.raw_user_meta_data->>'doc_type') = 'cnpj'
+      then nullif(coalesce(new.raw_user_meta_data->>'company_name', new.raw_user_meta_data->>'full_name'), '')
+      else null
+    end
+  )
+  on conflict (id) do update set
+    email = excluded.email,
+    full_name = coalesce(excluded.full_name, profiles.full_name),
+    phone = coalesce(excluded.phone, profiles.phone),
+    cpf = coalesce(excluded.cpf, profiles.cpf),
+    cnpj = coalesce(excluded.cnpj, profiles.cnpj),
+    company_name = coalesce(excluded.company_name, profiles.company_name);
   return new;
 end;
 $$ language plpgsql security definer;

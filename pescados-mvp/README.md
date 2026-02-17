@@ -1,6 +1,6 @@
-# Pescados Marketplace (MVP v2)
+# LotePro (MVP)
 
-Marketplace de pescados/frutos do mar com **app (B2B/B2C)** + **portal do fornecedor** + **API** + **Supabase**.
+Marketplace B2B/B2C com **app (comprador)** + **portal do fornecedor** + **API** + **Supabase**.
 
 Principais pontos deste MVP:
 
