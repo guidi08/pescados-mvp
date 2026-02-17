@@ -1,0 +1,15 @@
+{
+  "build": {
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://jqninaupxcihelbbginy.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_aKnuMTt-WWPBlptSdHPdMw_6hpveMxq",
+        "EXPO_PUBLIC_API_BASE_URL": "https://pescados-mvp-production.up.railway.app",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51T1aZDEM3M1BkB5vlqyx0l6z2L6tpyQcGSFPxXu4yk9in0eIszfNgIFBvTYqkgYFM2k81gHg1bn33SKpwYzCcFw500DBjfj4vB"
+      }
+    }
+  }
+}
