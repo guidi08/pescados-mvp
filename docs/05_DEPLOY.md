@@ -17,6 +17,7 @@
    - `supabase/schema.sql`
    - `supabase/rls.sql`
    - (opcional) `supabase/seed.sql`
+   - **Se você já tinha criado o banco antes desta versão:** execute também `docs/08_MIGRACOES.md`
 3. Em **Database → Replication**, habilite realtime nas tabelas:
    - `products`
    - `product_variants`

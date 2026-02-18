@@ -49,7 +49,8 @@ Para MVP:
    - frete fixo
    - pedido mínimo
    - habilitar B2C (se tiver logística)
-   - (opcional) reserva de risco (%)
+   - (opcional) reserva de risco (%) [retida pela plataforma]
+   - dias de entrega (seg…dom)
 3. Conecta recebimentos no Stripe (Connect Express)
 4. Cadastra produtos e variantes:
    - fresco/congelado, validade mínima
@@ -64,8 +65,5 @@ Para MVP:
 
 Quando configurada (`sellers.risk_reserve_bps > 0`):
 
-- No pagamento, parte do valor fica retida na plataforma
-- Cria-se um registro em `seller_reserves` com `release_at = now + 60d`
-- Um job (cron) chama `/jobs/release-reserves` e faz o **transfer** para o fornecedor quando vencer
-
-> Importante: reserva de risco é **passivo** (dinheiro do fornecedor), não receita.
+- No pagamento, parte do valor fica **retida pela plataforma**
+- A reserva não é repassada automaticamente ao fornecedor (é da plataforma)

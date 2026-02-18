@@ -12,5 +12,6 @@
       "react",
       "react-native"
     ]
-  }
+  },
+  "extends": "expo/tsconfig.base"
 }

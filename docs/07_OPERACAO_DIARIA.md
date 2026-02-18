@@ -6,8 +6,9 @@
 - Conferir validade mínima (lote)
 - Receber pedido por e-mail e separar itens
 - Para salmão (peso variável):
-  - lançar peso real no portal (endpoint de peso)
+  - lançar peso real no portal em **Dashboard → Pedidos**
   - sistema gera ajuste em carteira (B2B)
+  - se o cliente ficar com saldo negativo, ele precisará quitar (app → Saldo) antes de fazer novos pedidos
 
 ## Rotina da plataforma (admin)
 
@@ -18,7 +19,7 @@
   - solicitar que finalize Stripe Connect
 - Monitorar:
   - webhooks Stripe
-  - saldo de reservas
+  - saldo de reservas (seller_reserves)
   - chargebacks/disputas
 - Suporte:
   - cancelamentos congelados (janela)
@@ -32,5 +33,11 @@
   - orders (snapshot)
   - seller_reserves (ledger)
   - wallet_transactions (ajustes B2B)
+
+## Reserva de risco (60 dias)
+
+- Quando o pedido é pago, se houver reserva configurada no fornecedor, ela entra em `seller_reserves` como **held**.
+- Um job (cron) chama `POST /jobs/release-reserves` e libera automaticamente quando `release_at` chega.
+- Se houver reembolso/cancelamento, a reserva do pedido é marcada como **forfeited** (não libera).
 
 > Para automação fiscal (NF-e / NFS-e), recomenda-se integração futura com ERP.

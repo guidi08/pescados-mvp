@@ -1,4 +1,4 @@
--- Supabase RLS policies for Pescados Marketplace (MVP v2)
+-- Supabase RLS policies for LotePro
 
 -- Helper: is_admin()
 create or replace function public.is_admin()

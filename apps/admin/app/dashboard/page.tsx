@@ -13,16 +13,21 @@ type Seller = {
   id: string;
   display_name: string;
   order_email: string;
+  logo_url?: string | null;
   cutoff_time: string;
   active: boolean;
 
   shipping_fee_cents: number;
   min_order_cents: number;
   b2c_enabled: boolean;
+  delivery_days?: number[] | null;
 
   stripe_account_id: string | null;
   stripe_account_charges_enabled: boolean;
   stripe_account_payouts_enabled: boolean;
+
+  risk_reserve_bps?: number | null;
+  risk_reserve_days?: number | null;
 };
 
 type Product = {
@@ -49,6 +54,16 @@ function brlToCents(input: string): number {
   if (!Number.isFinite(n)) return 0;
   return Math.round(n * 100);
 }
+
+const DAY_OPTIONS = [
+  { value: 1, label: 'Seg' },
+  { value: 2, label: 'Ter' },
+  { value: 3, label: 'Qua' },
+  { value: 4, label: 'Qui' },
+  { value: 5, label: 'Sex' },
+  { value: 6, label: 'Sáb' },
+  { value: 7, label: 'Dom' },
+];
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -209,6 +224,8 @@ export default function DashboardPage() {
         <div>
           <button className="btn secondary" onClick={() => (window.location.href = '/dashboard/products/new')}>+ Novo produto</button>
           <span style={{ marginLeft: 8 }} />
+          <button className="btn secondary" onClick={() => (window.location.href = '/dashboard/orders')}>Pedidos</button>
+          <span style={{ marginLeft: 8 }} />
           <button className="btn" onClick={logout}>Sair</button>
         </div>
       </div>
@@ -226,6 +243,16 @@ export default function DashboardPage() {
                 className="input"
                 value={seller.order_email}
                 onChange={(e) => setSeller({ ...seller, order_email: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="label">Logo do fornecedor (URL)</label>
+              <input
+                className="input"
+                value={seller.logo_url ?? ''}
+                onChange={(e) => setSeller({ ...seller, logo_url: e.target.value })}
+                placeholder="https://.../logo.png"
               />
             </div>
 
@@ -264,6 +291,24 @@ export default function DashboardPage() {
             </div>
 
             <div>
+              <label className="label">Reserva de risco (%)</label>
+              <input
+                className="input"
+                type="number"
+                step="0.1"
+                value={((seller.risk_reserve_bps ?? 0) / 100).toFixed(1)}
+                onChange={(e) => {
+                  const pct = Number(String(e.target.value).replace(',', '.'));
+                  const bps = Number.isFinite(pct) ? Math.max(0, Math.round(pct * 100)) : 0;
+                  setSeller({ ...seller, risk_reserve_bps: bps });
+                }}
+              />
+              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+                Retido por {seller.risk_reserve_days ?? 60} dias e liberado depois (proteção contra chargeback).
+              </div>
+            </div>
+
+            <div>
               <label className="label">B2C habilitado</label>
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
                 <input
@@ -278,8 +323,35 @@ export default function DashboardPage() {
 
           <div className="row" style={{ marginTop: 12 }}>
             <div style={{ flex: 1 }}>
+              <label className="label">Dias de entrega</label>
+              <div className="row" style={{ gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                {DAY_OPTIONS.map((d) => (
+                  <label key={d.value} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={(seller.delivery_days ?? [1, 2, 3, 4, 5]).includes(d.value)}
+                      onChange={(e) => {
+                        const current = seller.delivery_days ?? [1, 2, 3, 4, 5];
+                        const next = e.target.checked
+                          ? Array.from(new Set([...current, d.value])).sort((a, b) => a - b)
+                          : current.filter((v) => v !== d.value);
+                        setSeller({ ...seller, delivery_days: next });
+                      }}
+                    />
+                    {d.label}
+                  </label>
+                ))}
+              </div>
+              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+                Regra: sábado entrega terça; domingo entrega segunda. Demais dias seguem cut-off.
+              </div>
+            </div>
+          </div>
+
+          <div className="row" style={{ marginTop: 12 }}>
+            <div style={{ flex: 1 }}>
               <label className="label">Recebimentos (Stripe)</label>
-              <div className="row" style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div className="row inline" style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span className={`badge ${seller.stripe_account_id ? 'green' : 'gray'}`}>
                   {seller.stripe_account_id ? 'Conta conectada' : 'Não configurado'}
                 </span>
@@ -306,10 +378,13 @@ export default function DashboardPage() {
           <div style={{ marginTop: 12 }}>
             <button className="btn" onClick={() => updateSeller({
               order_email: seller.order_email,
+              logo_url: seller.logo_url ?? null,
               cutoff_time: seller.cutoff_time,
               shipping_fee_cents: seller.shipping_fee_cents,
               min_order_cents: seller.min_order_cents,
               b2c_enabled: seller.b2c_enabled,
+              risk_reserve_bps: seller.risk_reserve_bps ?? 0,
+              delivery_days: seller.delivery_days ?? [1, 2, 3, 4, 5],
             })}>
               Salvar
             </button>
@@ -319,88 +394,90 @@ export default function DashboardPage() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <h2>Produtos</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Produto</th>
-              <th>Tipo</th>
-              <th>Validade mínima</th>
-              <th>Preço base</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <div><strong>{p.name}</strong></div>
-                  <div style={{ color: '#666', fontSize: 12 }}>
-                    {p.unit} • {p.pricing_mode === 'per_kg_box' ? 'por caixa (peso variável)' : 'por unidade'} • atualizado {new Date(p.updated_at).toLocaleString('pt-BR')}
-                  </div>
-                </td>
-                <td>
-                  <span className={`badge ${p.fresh ? 'green' : 'gray'}`}>{p.fresh ? 'Fresco' : 'Congelado'}</span>
-                  <div style={{ marginTop: 6 }}>
-                    <label style={{ fontSize: 12 }}>
-                      <input
-                        type="checkbox"
-                        checked={p.fresh}
-                        onChange={(e) => updateProduct(p.id, { fresh: e.target.checked })}
-                      />{' '}
-                      Fresco
-                    </label>
-                  </div>
-                </td>
-                <td>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 160 }}
-                    type="date"
-                    value={p.min_expiry_date ?? ''}
-                    onChange={(e) => updateProduct(p.id, { min_expiry_date: e.target.value || null })}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 140 }}
-                    type="number"
-                    step="0.01"
-                    value={(p.base_price_cents / 100).toFixed(2)}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (Number.isFinite(v)) updateProduct(p.id, { base_price_cents: Math.round(v * 100) });
-                    }}
-                  />
-                  <div style={{ color: '#666', fontSize: 12 }}>
-                    {centsToBRL(p.base_price_cents)} / {p.pricing_mode === 'per_kg_box' ? 'kg' : p.unit}
-                    {p.pricing_mode === 'per_kg_box' && p.estimated_box_weight_kg ? ` • ~${p.estimated_box_weight_kg}kg/cx` : ''}
-                  </div>
-                </td>
-                <td>
-                  <span className={`badge ${p.active ? 'green' : 'gray'}`}>{p.active ? 'Ativo' : 'Pausado'}</span>
-                </td>
-                <td>
-                  <button className="btn secondary" onClick={() => updateProduct(p.id, { active: !p.active })}>
-                    {p.active ? 'Pausar' : 'Reativar'}
-                  </button>
-                  <span style={{ marginLeft: 8 }} />
-                  <button className="btn secondary" onClick={() => (window.location.href = `/dashboard/products/${p.id}`)}>
-                    Variantes
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!products.length && (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={6} style={{ color: '#666' }}>
-                  Nenhum produto cadastrado.
-                </td>
+                <th>Produto</th>
+                <th>Tipo</th>
+                <th>Validade mínima</th>
+                <th>Preço base</th>
+                <th>Status</th>
+                <th>Ações</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td data-label="Produto">
+                    <div><strong>{p.name}</strong></div>
+                    <div style={{ color: '#666', fontSize: 12 }}>
+                      {p.unit} • {p.pricing_mode === 'per_kg_box' ? 'por caixa (peso variável)' : 'por unidade'} • atualizado {new Date(p.updated_at).toLocaleString('pt-BR')}
+                    </div>
+                  </td>
+                  <td data-label="Tipo">
+                    <span className={`badge ${p.fresh ? 'green' : 'gray'}`}>{p.fresh ? 'Fresco' : 'Congelado'}</span>
+                    <div style={{ marginTop: 6 }}>
+                      <label style={{ fontSize: 12 }}>
+                        <input
+                          type="checkbox"
+                          checked={p.fresh}
+                          onChange={(e) => updateProduct(p.id, { fresh: e.target.checked })}
+                        />{' '}
+                        Fresco
+                      </label>
+                    </div>
+                  </td>
+                  <td data-label="Validade mínima">
+                    <input
+                      className="input"
+                      style={{ maxWidth: 160 }}
+                      type="date"
+                      value={p.min_expiry_date ?? ''}
+                      onChange={(e) => updateProduct(p.id, { min_expiry_date: e.target.value || null })}
+                    />
+                  </td>
+                  <td data-label="Preço base">
+                    <input
+                      className="input"
+                      style={{ maxWidth: 140 }}
+                      type="number"
+                      step="0.01"
+                      value={(p.base_price_cents / 100).toFixed(2)}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (Number.isFinite(v)) updateProduct(p.id, { base_price_cents: Math.round(v * 100) });
+                      }}
+                    />
+                    <div style={{ color: '#666', fontSize: 12 }}>
+                      {centsToBRL(p.base_price_cents)} / {p.pricing_mode === 'per_kg_box' ? 'kg' : p.unit}
+                      {p.pricing_mode === 'per_kg_box' && p.estimated_box_weight_kg ? ` • ~${p.estimated_box_weight_kg}kg/cx` : ''}
+                    </div>
+                  </td>
+                  <td data-label="Status">
+                    <span className={`badge ${p.active ? 'green' : 'gray'}`}>{p.active ? 'Ativo' : 'Pausado'}</span>
+                  </td>
+                  <td data-label="Ações">
+                    <button className="btn secondary" onClick={() => updateProduct(p.id, { active: !p.active })}>
+                      {p.active ? 'Pausar' : 'Reativar'}
+                    </button>
+                    <span style={{ marginLeft: 8 }} />
+                    <button className="btn secondary" onClick={() => (window.location.href = `/dashboard/products/${p.id}`)}>
+                      Variantes
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!products.length && (
+                <tr>
+                  <td colSpan={6} style={{ color: '#666' }}>
+                    Nenhum produto cadastrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -65,13 +65,13 @@ ${lines}
 Total: ${payload.total}
 
 ---
-Pescados Marketplace (MVP)
+LotePro
 `.trim();
 
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to: payload.to,
-    subject: `Novo pedido pago (${payload.orderId.slice(0, 8)}...)`,
+    subject: `Novo pedido - LotePro (${payload.orderId.slice(0, 8)}...)`,
     text,
   });
 }

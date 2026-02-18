@@ -1,4 +1,4 @@
--- Supabase schema for Pescados Marketplace (MVP v2)
+-- Supabase schema for LotePro (MVP)
 -- Run this inside Supabase SQL editor (in order): schema.sql then rls.sql.
 -- Notes:
 -- - Uses Supabase Auth (auth.users) for users
@@ -16,6 +16,11 @@ create table if not exists public.profiles (
 
   full_name text,
   phone text,
+
+  address jsonb,
+  city text,
+  state text,
+  postal_code text,
 
   -- identification (buyer can be CPF or CNPJ; seller will be a separate entity in sellers table)
   cpf text,
@@ -36,9 +41,36 @@ create table if not exists public.profiles (
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, role)
-  values (new.id, new.email, 'buyer')
-  on conflict (id) do update set email = excluded.email;
+  insert into public.profiles (
+    id,
+    email,
+    role,
+    full_name,
+    phone,
+    cpf,
+    cnpj,
+    company_name
+  )
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'role', 'buyer'),
+    nullif(new.raw_user_meta_data->>'full_name', ''),
+    nullif(new.raw_user_meta_data->>'phone', ''),
+    case when (new.raw_user_meta_data->>'doc_type') = 'cpf' then nullif(new.raw_user_meta_data->>'doc_number', '') else null end,
+    case when (new.raw_user_meta_data->>'doc_type') = 'cnpj' then nullif(new.raw_user_meta_data->>'doc_number', '') else null end,
+    case when (new.raw_user_meta_data->>'doc_type') = 'cnpj'
+      then nullif(coalesce(new.raw_user_meta_data->>'company_name', new.raw_user_meta_data->>'full_name'), '')
+      else null
+    end
+  )
+  on conflict (id) do update set
+    email = excluded.email,
+    full_name = coalesce(excluded.full_name, profiles.full_name),
+    phone = coalesce(excluded.phone, profiles.phone),
+    cpf = coalesce(excluded.cpf, profiles.cpf),
+    cnpj = coalesce(excluded.cnpj, profiles.cnpj),
+    company_name = coalesce(excluded.company_name, profiles.company_name);
   return new;
 end;
 $$ language plpgsql security definer;
@@ -59,6 +91,8 @@ create table if not exists public.sellers (
   order_email text not null,
   phone text,
 
+  logo_url text,
+
   address jsonb,
   city text,
   state text,
@@ -69,6 +103,7 @@ create table if not exists public.sellers (
   cutoff_time time not null default '18:00', -- pedidos até esse horário entregam D+1
   timezone text not null default 'America/Sao_Paulo',
   min_order_cents integer not null default 0,
+  delivery_days integer[] not null default '{1,2,3,4,5}', -- 1=Mon ... 7=Sun
 
   -- shipping: fixed or zero (MVP)
   shipping_fee_cents integer not null default 0,
@@ -242,6 +277,7 @@ create table if not exists public.seller_reserves (
   id uuid primary key default gen_random_uuid(),
   seller_id uuid not null references public.sellers(id) on delete cascade,
   order_id uuid not null references public.orders(id) on delete cascade,
+  constraint seller_reserves_order_unique unique (order_id),
 
   amount_cents integer not null,
   currency text not null default 'brl',

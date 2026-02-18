@@ -1,199 +1,252 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../../lib/supabaseClient';
-
-type Variant = {
-  id: string;
-  product_id: string;
-  name: string;
-  price_cents: number;
-  active: boolean;
-  min_expiry_date: string | null;
-};
 
 function centsToBRL(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function VariantsPage({ params }: { params: { id: string } }) {
-  const productId = params.id;
+function brlToCents(input: string): number {
+  const n = Number(String(input).replace(',', '.'));
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100);
+}
+
+export default function ProductDetailPage({ params }: any) {
+  const productId = params.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [productName, setProductName] = useState<string>('—');
-  const [variants, setVariants] = useState<Variant[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [product, setProduct] = useState<any | null>(null);
+  const [variants, setVariants] = useState<any[]>([]);
 
-  const [newName, setNewName] = useState('');
-  const [newPrice, setNewPrice] = useState('0.00');
-  const [newExpiry, setNewExpiry] = useState('');
+  const [newVarName, setNewVarName] = useState('');
+  const [newVarPrice, setNewVarPrice] = useState('0');
+  const [newVarExpiry, setNewVarExpiry] = useState('');
 
   async function load() {
     setLoading(true);
     setMsg(null);
 
     const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
+    const session = sessionData.session;
+    if (!session) {
       window.location.href = '/login';
       return;
     }
 
-    const [{ data: p, error: pErr }, { data: v, error: vErr }] = await Promise.all([
-      supabase.from('products').select('id,name').eq('id', productId).single(),
-      supabase.from('product_variants').select('*').eq('product_id', productId).order('created_at', { ascending: false }),
-    ]);
+    const { data: p, error: pErr } = await supabase.from('products').select('*').eq('id', productId).single();
+    if (pErr) {
+      setMsg(pErr.message);
+      setLoading(false);
+      return;
+    }
 
-    if (pErr) setMsg(pErr.message);
-    if (vErr) setMsg(vErr.message);
-
-    if (p) setProductName(p.name);
-    setVariants((v ?? []) as any);
-
-    // realtime variants
-    const channel = supabase
-      .channel('realtime-variants')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_variants', filter: `product_id=eq.${productId}` }, () => {
-        supabase.from('product_variants').select('*').eq('product_id', productId).order('created_at', { ascending: false })
-          .then(({ data }) => setVariants((data ?? []) as any));
-      })
-      .subscribe();
-
+    const { data: vs } = await supabase.from('product_variants').select('*').eq('product_id', productId).order('created_at', { ascending: false });
+    setProduct(p);
+    setVariants(vs ?? []);
     setLoading(false);
-
-    return () => { supabase.removeChannel(channel); };
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [productId]);
 
-  async function addVariant() {
+  const isVariableWeight = product?.pricing_mode === 'per_kg_box';
+
+  async function updateProduct(patch: any) {
     setMsg(null);
-    const price_cents = Math.round(Number(newPrice) * 100);
-
-    const { error } = await supabase.from('product_variants').insert({
-      product_id: productId,
-      name: newName,
-      price_cents,
-      active: true,
-      min_expiry_date: newExpiry || null,
-    });
-
+    const { error } = await supabase.from('products').update(patch).eq('id', productId);
     if (error) setMsg(error.message);
     else {
-      setNewName('');
-      setNewPrice('0.00');
-      setNewExpiry('');
+      setMsg('Produto atualizado ✅');
+      await load();
     }
   }
 
-  async function updateVariant(id: string, patch: Partial<Variant>) {
+  async function createVariant() {
     setMsg(null);
-    const { error } = await supabase.from('product_variants').update(patch).eq('id', id);
+    const priceCents = brlToCents(newVarPrice);
+    if (!newVarName.trim()) {
+      setMsg('Informe o nome do calibre/variante.');
+      return;
+    }
+    if (!priceCents || priceCents <= 0) {
+      setMsg('Informe um preço válido.');
+      return;
+    }
+    const { error } = await supabase.from('product_variants').insert({
+      product_id: productId,
+      name: newVarName.trim(),
+      price_cents: priceCents,
+      min_expiry_date: newVarExpiry.trim() ? newVarExpiry.trim() : null,
+      active: true,
+    });
     if (error) setMsg(error.message);
+    else {
+      setNewVarName('');
+      setNewVarPrice('0');
+      setNewVarExpiry('');
+      await load();
+    }
+  }
+
+  async function updateVariant(variantId: string, patch: any) {
+    setMsg(null);
+    const { error } = await supabase.from('product_variants').update(patch).eq('id', variantId);
+    if (error) setMsg(error.message);
+    else await load();
   }
 
   if (loading) {
     return (
       <div className="container">
-        <div className="card">
-          <h1>Variantes</h1>
-          <p>Carregando...</p>
-        </div>
+        <div className="card">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="container">
+        <div className="card">Produto não encontrado.</div>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <div className="card">
-        <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1>Variantes (calibre) — {productName}</h1>
-            <p style={{ color: '#666' }}>Use variantes para tamanhos/calibres diferentes (ex.: 2-3kg, 3-4kg...).</p>
-          </div>
-          <div>
-            <button className="btn secondary" onClick={() => (window.location.href = '/dashboard')}>Voltar</button>
-          </div>
-        </div>
+      <div className="row inline" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+        <h2>{product.name}</h2>
+        <a className="btn secondary" href="/dashboard">Voltar</a>
+      </div>
 
-        {msg && <p style={{ marginTop: 12 }}>{msg}</p>}
+      {msg ? <div className="card" style={{ border: '1px solid #ffd2d2', color: '#a00', marginBottom: 12 }}>{msg}</div> : null}
 
-        <h2 style={{ marginTop: 16 }}>Adicionar variante</h2>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3 style={{ marginTop: 0 }}>Configurações</h3>
         <div className="row">
           <div>
-            <label className="label">Nome</label>
-            <input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex: 3-4kg" />
+            <label className="label">Preço base</label>
+            <input
+              className="input"
+              defaultValue={(Number(product.base_price_cents ?? 0) / 100).toFixed(2).replace('.', ',')}
+              onBlur={(e) => updateProduct({ base_price_cents: brlToCents((e.target as any).value) })}
+            />
+            <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+              {isVariableWeight ? 'Preço por kg.' : `Preço por ${product.unit}.`}
+            </div>
           </div>
           <div>
-            <label className="label">Preço (R$)</label>
-            <input className="input" type="number" step="0.01" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+            <label className="label">Ativo</label>
+            <select className="input" value={product.active ? '1' : '0'} onChange={(e) => updateProduct({ active: e.target.value === '1' })}>
+              <option value="1">Sim</option>
+              <option value="0">Não (pausado)</option>
+            </select>
           </div>
           <div>
-            <label className="label">Validade mínima</label>
-            <input className="input" type="date" value={newExpiry} onChange={(e) => setNewExpiry(e.target.value)} />
+            <label className="label">Fresco</label>
+            <select className="input" value={product.fresh ? '1' : '0'} onChange={(e) => updateProduct({ fresh: e.target.value === '1' })}>
+              <option value="1">Sim</option>
+              <option value="0">Não</option>
+            </select>
           </div>
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <button className="btn" onClick={addVariant} disabled={!newName || Number(newPrice) <= 0}>Adicionar</button>
         </div>
 
-        <h2 style={{ marginTop: 24 }}>Lista</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Variante</th>
-              <th>Validade mínima</th>
-              <th>Preço</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {variants.map((v) => (
-              <tr key={v.id}>
-                <td><strong>{v.name}</strong></td>
-                <td>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 160 }}
-                    type="date"
-                    value={v.min_expiry_date ?? ''}
-                    onChange={(e) => updateVariant(v.id, { min_expiry_date: e.target.value || null })}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 140 }}
-                    type="number"
-                    step="0.01"
-                    value={(v.price_cents / 100).toFixed(2)}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      if (Number.isFinite(val)) updateVariant(v.id, { price_cents: Math.round(val * 100) });
-                    }}
-                  />
-                  <div style={{ color: '#666', fontSize: 12 }}>{centsToBRL(v.price_cents)}</div>
-                </td>
-                <td>
-                  <span className={`badge ${v.active ? 'green' : 'gray'}`}>{v.active ? 'Ativo' : 'Pausado'}</span>
-                </td>
-                <td>
-                  <button className="btn secondary" onClick={() => updateVariant(v.id, { active: !v.active })}>
-                    {v.active ? 'Pausar' : 'Reativar'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!variants.length && (
+        {isVariableWeight ? (
+          <div className="row" style={{ marginTop: 12 }}>
+            <div>
+              <label className="label">Peso estimado por caixa (kg)</label>
+              <input
+                className="input"
+                defaultValue={String(product.estimated_box_weight_kg ?? '')}
+                onBlur={(e) => updateProduct({ estimated_box_weight_kg: Number((e.target as any).value) })}
+              />
+            </div>
+            <div>
+              <label className="label">Variação máx. (%)</label>
+              <input
+                className="input"
+                defaultValue={String(product.max_weight_variation_pct ?? '')}
+                onBlur={(e) => updateProduct({ max_weight_variation_pct: Number((e.target as any).value) })}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="card">
+        <div className="row inline" style={{ justifyContent: 'space-between' }}>
+          <h3 style={{ marginTop: 0 }}>Calibres / Variantes</h3>
+        </div>
+
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={5} style={{ color: '#666' }}>Nenhuma variante cadastrada (produto usa preço base).</td>
+                <th>Nome</th>
+                <th>Preço</th>
+                <th>Validade mínima</th>
+                <th>Status</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {variants.map((v) => (
+                <tr key={v.id}>
+                  <td data-label="Nome">{v.name}</td>
+                  <td data-label="Preço">
+                    <input
+                      className="input"
+                      style={{ width: 140 }}
+                      defaultValue={(Number(v.price_cents ?? 0) / 100).toFixed(2).replace('.', ',')}
+                      onBlur={(e) => updateVariant(v.id, { price_cents: brlToCents((e.target as any).value) })}
+                    />
+                  </td>
+                  <td data-label="Validade mínima">
+                    <input
+                      className="input"
+                      style={{ width: 160 }}
+                      defaultValue={v.min_expiry_date ?? ''}
+                      onBlur={(e) => updateVariant(v.id, { min_expiry_date: (e.target as any).value || null })}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </td>
+                  <td data-label="Status">
+                    <select className="input" style={{ width: 140 }} value={v.active ? '1' : '0'} onChange={(e) => updateVariant(v.id, { active: e.target.value === '1' })}>
+                      <option value="1">Ativo</option>
+                      <option value="0">Inativo</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 16 }}>
+          <h4 style={{ marginTop: 0 }}>Adicionar variante</h4>
+          <div className="row">
+            <div>
+              <label className="label">Nome</label>
+              <input className="input" value={newVarName} onChange={(e) => setNewVarName(e.target.value)} placeholder="Ex: 3-4kg" />
+            </div>
+            <div>
+              <label className="label">Preço (R$)</label>
+              <input className="input" value={newVarPrice} onChange={(e) => setNewVarPrice(e.target.value)} placeholder="Ex: 59,90" />
+            </div>
+            <div>
+              <label className="label">Validade mínima</label>
+              <input className="input" value={newVarExpiry} onChange={(e) => setNewVarExpiry(e.target.value)} placeholder="YYYY-MM-DD" />
+            </div>
+          </div>
+          <button className="btn" onClick={createVariant} style={{ marginTop: 12 }}>Criar variante</button>
+        </div>
+
+        <div style={{ marginTop: 16, color: '#666', fontSize: 12 }}>
+          Preço final no app: se existir variante selecionada, usa o preço da variante; senão usa o preço base.
+        </div>
       </div>
     </div>
   );

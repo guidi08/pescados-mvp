@@ -50,7 +50,11 @@ export default function PixScreen({ route, navigation }: Props) {
 
         <View style={{ gap: spacing['2'] }}>
           <Button title="Ver meus pedidos" onPress={() => navigation.navigate('Orders')} />
-          <Button title="Voltar ao início" onPress={() => navigation.navigate('Home')} variant="secondary" />
+          <Button
+            title="Voltar ao início"
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] as any })}
+            variant="secondary"
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

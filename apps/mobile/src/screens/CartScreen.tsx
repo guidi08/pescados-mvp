@@ -19,15 +19,39 @@ function lineTotalCents(it: CartItem): number {
   return Math.round(it.unitPriceCents * est * it.quantity);
 }
 
+function estimateCartKg(items: CartItem[]): number {
+  let total = 0;
+  for (const it of items) {
+    if (it.pricingMode === 'per_kg_box') {
+      const est = Number(it.estimatedBoxWeightKg ?? 0);
+      total += est * Number(it.quantity ?? 0);
+      continue;
+    }
+    const unit = String(it.unit ?? '').toLowerCase();
+    if (unit === 'kg') {
+      total += Number(it.quantity ?? 0);
+      continue;
+    }
+    if ((unit === 'cx' || unit === 'caixa') && it.estimatedBoxWeightKg) {
+      total += Number(it.estimatedBoxWeightKg) * Number(it.quantity ?? 0);
+    }
+  }
+  return total;
+}
+
 export default function CartScreen({ navigation }: Props) {
-  const { items, sellerName, updateQuantity, removeItem, clear, subtotalCents } = useCart();
+  const { items, sellerName, updateQuantity, removeItem, clear, subtotalCents, shippingFeeCents, totalCents } = useCart();
+  const approxKg = estimateCartKg(items);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
       <ScrollView contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}>
         <Text style={textStyle('h1')}>Carrinho</Text>
         {sellerName ? (
-          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Fornecedor: {sellerName}</Text>
+          <>
+            <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Fornecedor: {sellerName}</Text>
+            <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Peso estimado: ≈ {approxKg.toFixed(1)} kg</Text>
+          </>
         ) : null}
 
         {!items.length ? (
@@ -84,10 +108,14 @@ export default function CartScreen({ navigation }: Props) {
             ))}
 
             <Card>
-              <Text style={textStyle('h2')}>Subtotal estimado: {centsToBRL(subtotalCents)}</Text>
+              <Text style={textStyle('h2')}>Total estimado: {centsToBRL(totalCents)}</Text>
               <Text style={[textStyle('caption'), { color: colors.text.secondary, marginTop: spacing['2'] }]}
               >
-                O frete (se houver) aparece no checkout e é definido pelo fornecedor.
+                Subtotal: {centsToBRL(subtotalCents)} • Frete: {shippingFeeCents ? centsToBRL(shippingFeeCents) : 'grátis'}
+              </Text>
+              <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['1'] }]}
+              >
+                * Frete é uma estimativa baseada no cadastro do fornecedor.
               </Text>
             </Card>
 

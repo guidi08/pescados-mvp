@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Pescados Marketplace",
-    "slug": "pescados-marketplace",
-    "scheme": "pescados",
-    "version": "0.1.0",
+    "name": "LotePro",
+    "slug": "lotepro",
+    "scheme": "lotepro",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,18 +17,18 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.seudominio.pescados"
+      "bundleIdentifier": "io.guestengine.lotepro"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.seudominio.pescados"
+      "package": "io.guestengine.lotepro"
     },
     "extra": {
       "eas": {
-        "projectId": "REPLACE_ME"
+        "projectId": "01a6d485-bdf3-4c4c-9463-aa4f9e382d80"
       }
     }
   }

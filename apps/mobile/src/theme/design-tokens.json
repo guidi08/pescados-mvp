@@ -1,9 +1,9 @@
 {
   "colors": {
     "brand": {
-      "primary": "#0E7C86",
-      "primaryDark": "#0A5A61",
-      "primaryLight": "#E6F7F8",
+      "primary": "#EA1D2C",
+      "primaryDark": "#C91522",
+      "primaryLight": "#FEEAEC",
       "secondary": "#0B2340",
       "secondaryLight": "#E8EEF6"
     },
@@ -30,13 +30,13 @@
       "secondary": "#4B5565",
       "tertiary": "#6B7687",
       "inverse": "#FFFFFF",
-      "link": "#0E7C86"
+      "link": "#EA1D2C"
     },
     "border": {
       "subtle": "#EEF0F3",
       "default": "#D9DEE5",
       "strong": "#B6BEC9",
-      "focus": "#0E7C86"
+      "focus": "#EA1D2C"
     },
     "semantic": {
       "success": "#1B9A59",

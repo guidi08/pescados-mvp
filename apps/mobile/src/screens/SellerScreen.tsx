@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+
+import type { RootStackParamList } from '../../App';
 import { supabase } from '../supabaseClient';
 import { useCart } from '../context/CartContext';
-import Button from '../components/Button';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
 import { colors, spacing, textStyle } from '../theme';
@@ -33,7 +33,7 @@ export default function SellerScreen({ route, navigation }: Props) {
   const { sellerId, sellerName } = route.params;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const { items, sellerId: cartSellerId } = useCart();
+  const { sellerId: cartSellerId } = useCart();
 
   async function load() {
     setLoading(true);
@@ -45,6 +45,7 @@ export default function SellerScreen({ route, navigation }: Props) {
 
     if (!error) {
       const list = (data ?? []) as any as Product[];
+      // active first
       list.sort((a, b) => Number(b.active) - Number(a.active));
       setProducts(list);
     }
@@ -61,7 +62,12 @@ export default function SellerScreen({ route, navigation }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sellerId]);
+
+  const warningDifferentSeller = useMemo(() => {
+    return cartSellerId && cartSellerId !== sellerId;
+  }, [cartSellerId, sellerId]);
 
   function priceLabel(p: Product): string {
     if (p.pricing_mode === 'per_kg_box') {
@@ -73,15 +79,10 @@ export default function SellerScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
-      <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
+      <View style={{ padding: spacing['4'], gap: spacing['2'] }}>
         <Text style={textStyle('h1')}>{sellerName}</Text>
 
-        <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
-          <Button title={`Carrinho (${items.length})`} onPress={() => navigation.navigate('Cart')} size="sm" />
-          <Button title="Voltar" onPress={() => navigation.goBack()} size="sm" variant="secondary" />
-        </View>
-
-        {cartSellerId && cartSellerId !== sellerId ? (
+        {warningDifferentSeller ? (
           <Text style={[textStyle('small'), { color: colors.semantic.warning }]}
           >
             Atenção: seu carrinho contém itens de outro fornecedor. Ao adicionar aqui, o carrinho será substituído.
@@ -94,7 +95,7 @@ export default function SellerScreen({ route, navigation }: Props) {
       <FlatList
         data={products}
         keyExtractor={(p) => p.id}
-        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}
+        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'], paddingBottom: 120 }}
         renderItem={({ item }) => (
           <TouchableOpacity
             disabled={!item.active}
@@ -113,8 +114,7 @@ export default function SellerScreen({ route, navigation }: Props) {
               </Text>
               <Text style={[textStyle('bodyStrong'), { marginTop: spacing['2'] }]}>{priceLabel(item)}</Text>
               {!item.active ? (
-                <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}
-                >Pausado</Text>
+                <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}>Pausado</Text>
               ) : null}
             </Card>
           </TouchableOpacity>

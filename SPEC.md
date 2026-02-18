@@ -1,6 +1,6 @@
-# Pescados Marketplace — MVP v2
+# LotePro — MVP
 
-Este repositório contém um MVP completo (app + portal + API + banco) para um marketplace de pescados/frutos do mar com:
+Este repositório contém um MVP completo (app + portal + API + banco) para um marketplace B2B/B2C com:
 
 - **B2B e B2C**
   - B2C apenas para fornecedores com logística (flag `sellers.b2c_enabled`).
@@ -9,7 +9,7 @@ Este repositório contém um MVP completo (app + portal + API + banco) para um m
   - O fornecedor recebe **GMV – (5% + 3,99%) – reserva de risco (se houver)**.
   - A plataforma retém **apenas**: **5% (comissão) + 3,99% (taxa de processamento)**.
   - A plataforma **não repassa** a taxa fixa por transação (ex.: R$0,39) neste momento — ela fica como custo da operação.
-- **Reserva de risco (rolling reserve)**: % configurável por fornecedor, retida por **60 dias** e liberada automaticamente por um job.
+- **Reserva de risco (rolling reserve)**: % configurável por fornecedor, **retida pela plataforma** por **60 dias**.
 - **Operação (SP capital)**: fornecedores definem frete fixo (ou zero) e cut-off para entrega D+1.
 
 > **Importante**: este é um MVP técnico. Termos/Políticas são modelos e devem passar por revisão jurídica/contábil.
