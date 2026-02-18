@@ -580,44 +580,49 @@ app.post('/wallet/topup/pix', requireAuth, async (req: AuthedRequest, res) => {
 const sellerOnboardingSchema = z.object({ sellerId: z.string().uuid() });
 
 app.post('/sellers/stripe/onboarding-link', requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = sellerOnboardingSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
+  try {
+    const parsed = sellerOnboardingSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
 
-  const { sellerId } = parsed.data;
-  const userId = req.user!.id;
+    const { sellerId } = parsed.data;
+    const userId = req.user!.id;
 
-  // Ensure user belongs to this seller (or admin)
-  const { data: profile } = await supabaseService.from('profiles').select('role, seller_id').eq('id', userId).single();
-  const isAdmin = profile?.role === 'admin';
-  if (!isAdmin && profile?.seller_id !== sellerId) {
-    return res.status(403).json({ error: 'forbidden' });
-  }
+    // Ensure user belongs to this seller (or admin)
+    const { data: profile } = await supabaseService.from('profiles').select('role, seller_id').eq('id', userId).single();
+    const isAdmin = profile?.role === 'admin';
+    if (!isAdmin && profile?.seller_id !== sellerId) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
 
-  const { data: seller } = await supabaseService.from('sellers').select('*').eq('id', sellerId).single();
-  if (!seller) return res.status(404).json({ error: 'seller_not_found' });
+    const { data: seller } = await supabaseService.from('sellers').select('*').eq('id', sellerId).single();
+    if (!seller) return res.status(404).json({ error: 'seller_not_found' });
 
-  let stripeAccountId = seller.stripe_account_id as string | null;
+    let stripeAccountId = seller.stripe_account_id as string | null;
 
-  if (!stripeAccountId) {
-    const acct = await stripe.accounts.create({
-      type: 'express',
-      country: 'BR',
-      capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-      business_type: 'company',
-      metadata: { seller_id: sellerId },
+    if (!stripeAccountId) {
+      const acct = await stripe.accounts.create({
+        type: 'express',
+        country: 'BR',
+        capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+        business_type: 'company',
+        metadata: { seller_id: sellerId },
+      });
+      stripeAccountId = acct.id;
+      await supabaseService.from('sellers').update({ stripe_account_id: stripeAccountId }).eq('id', sellerId);
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: stripeAccountId,
+      refresh_url: `${env.ADMIN_BASE_URL}/dashboard`,
+      return_url: `${env.ADMIN_BASE_URL}/dashboard`,
+      type: 'account_onboarding',
     });
-    stripeAccountId = acct.id;
-    await supabaseService.from('sellers').update({ stripe_account_id: stripeAccountId }).eq('id', sellerId);
+
+    return res.json({ url: accountLink.url, stripeAccountId });
+  } catch (e: any) {
+    console.error('stripe_onboarding_error', e?.message ?? e);
+    return res.status(500).json({ error: 'stripe_onboarding_error', message: e?.message ?? String(e) });
   }
-
-  const accountLink = await stripe.accountLinks.create({
-    account: stripeAccountId,
-    refresh_url: `${env.ADMIN_BASE_URL}/dashboard`,
-    return_url: `${env.ADMIN_BASE_URL}/dashboard`,
-    type: 'account_onboarding',
-  });
-
-  return res.json({ url: accountLink.url, stripeAccountId });
 });
 
 /**
