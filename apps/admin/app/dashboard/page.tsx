@@ -336,10 +336,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div>
-              <!-- removed risk reserve -->
-              {/* reserva de risco removida */}
-            </div>
+            {null}
 
             <div>
               <label className="label">B2C habilitado</label>
@@ -416,7 +413,7 @@ export default function DashboardPage() {
               shipping_fee_cents: seller.shipping_fee_cents,
               min_order_cents: seller.min_order_cents,
               b2c_enabled: seller.b2c_enabled,
-              /* risk_reserve_bps removido */
+              // risk_reserve_bps removido
               delivery_days: seller.delivery_days ?? [1, 2, 3, 4, 5],
             })}>
               Salvar
