@@ -60,7 +60,7 @@ export default function CartBar({ navigationRef }: { navigationRef: NavigationCo
   if (!items.length) return null;
 
   const bottomOffset = (currentRouteName && TAB_ROUTES.has(currentRouteName))
-    ? (insets.bottom || 0) + 56
+    ? (insets.bottom || 0) + 72
     : (insets.bottom || 0) + 8;
 
   return (
