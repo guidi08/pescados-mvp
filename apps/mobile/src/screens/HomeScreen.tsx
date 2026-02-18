@@ -100,24 +100,43 @@ export default function HomeScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => navigation.navigate('Seller', { sellerId: item.id, sellerName: item.display_name })}>
             <Card>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1, paddingRight: spacing['3'] }}>
-                  <Text style={textStyle('h3')}>{item.display_name}</Text>
-                  <Text style={[textStyle('caption'), { color: colors.text.secondary, marginTop: spacing['1'] }]}
-                  >
-                    {item.city}/{item.state}
-                  </Text>
+              <View style={{ flexDirection: 'row', gap: spacing['3'] }}>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    backgroundColor: colors.background.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border.subtle,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={textStyle('bodyStrong')}>L</Text>
                 </View>
-                <Badge label={channel === 'b2b' ? 'B2B' : 'B2C'} variant={channel === 'b2b' ? 'b2b' : 'b2c'} />
-              </View>
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing['2'], marginTop: spacing['2'] }}>
-                <Badge label={`Cut-off: ${item.cutoff_time}`} variant="variable" />
-                {item.min_order_cents ? <Badge label={`Mín.: ${centsToBRL(item.min_order_cents)}`} variant="variable" /> : null}
-                <Badge
-                  label={item.shipping_fee_cents ? `Frete: ${centsToBRL(item.shipping_fee_cents)}` : 'Frete: grátis'}
-                  variant="neutral"
-                />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1, paddingRight: spacing['3'] }}>
+                      <Text style={textStyle('h3')}>{item.display_name}</Text>
+                      <Text style={[textStyle('caption'), { color: colors.text.secondary, marginTop: spacing['1'] }]}
+                      >
+                        {item.city}/{item.state}
+                      </Text>
+                    </View>
+                    <Badge label={channel === 'b2b' ? 'B2B' : 'B2C'} variant={channel === 'b2b' ? 'b2b' : 'b2c'} />
+                  </View>
+
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing['2'], marginTop: spacing['2'] }}>
+                    <Badge label={`Cut-off: ${item.cutoff_time}`} variant="variable" />
+                    {item.min_order_cents ? <Badge label={`Mín.: ${centsToBRL(item.min_order_cents)}`} variant="variable" /> : null}
+                    <Badge
+                      label={item.shipping_fee_cents ? `Frete: ${centsToBRL(item.shipping_fee_cents)}` : 'Frete: grátis'}
+                      variant="neutral"
+                    />
+                  </View>
+                </View>
               </View>
             </Card>
           </TouchableOpacity>

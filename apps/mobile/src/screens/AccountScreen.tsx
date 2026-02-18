@@ -20,6 +20,7 @@ export default function AccountScreen() {
   const [docNumber, setDocNumber] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [saving, setSaving] = useState(false);
+  const docLocked = Boolean(profile?.cpf || profile?.cnpj);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
@@ -121,13 +122,15 @@ export default function AccountScreen() {
               title="CPF"
               size="sm"
               variant={docType === 'cpf' ? 'primary' : 'secondary'}
-              onPress={() => setDocType('cpf')}
+              onPress={() => !docLocked && setDocType('cpf')}
+              disabled={docLocked}
             />
             <Button
               title="CNPJ"
               size="sm"
               variant={docType === 'cnpj' ? 'primary' : 'secondary'}
-              onPress={() => setDocType('cnpj')}
+              onPress={() => !docLocked && setDocType('cnpj')}
+              disabled={docLocked}
             />
           </View>
 
@@ -174,6 +177,12 @@ export default function AccountScreen() {
           >
             Importante: CNPJ libera o canal B2B (mais fornecedores). CPF é canal B2C.
           </Text>
+          {docLocked ? (
+            <Text style={[textStyle('caption'), { color: colors.semantic.warning, marginTop: spacing['2'] }]}
+            >
+              Tipo de cadastro já definido e não pode ser alterado.
+            </Text>
+          ) : null}
         </Card>
 
         <View style={{ gap: spacing['2'] }}>

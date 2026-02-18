@@ -49,6 +49,8 @@ export default function CartBar({ navigationRef }: { navigationRef: NavigationCo
   const { items, totalCents } = useCart();
   const insets = useSafeAreaInsets();
 
+  const kg = useMemo(() => estimateCartKg(items as any), [items]);
+
   // Navigation may not be ready on first render
   if (!navigationRef.isReady?.()) return null;
 
@@ -56,8 +58,6 @@ export default function CartBar({ navigationRef }: { navigationRef: NavigationCo
   if (currentRouteName && HIDE_ON.has(currentRouteName)) return null;
 
   if (!items.length) return null;
-
-  const kg = useMemo(() => estimateCartKg(items as any), [items]);
 
   const bottomOffset = (currentRouteName && TAB_ROUTES.has(currentRouteName))
     ? (insets.bottom || 0) + 56
