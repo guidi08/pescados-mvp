@@ -71,6 +71,7 @@ export default function DashboardPage() {
   const [seller, setSeller] = useState<Seller | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const sellerId = profile?.seller_id ?? null;
 
@@ -160,6 +161,34 @@ export default function DashboardPage() {
     else setMsg('Configurações atualizadas ✅');
   }
 
+  async function uploadSellerLogo(file: File) {
+    if (!sellerId) return;
+    setMsg(null);
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `${sellerId}/logo-${Date.now()}.${ext}`;
+
+      const { error: upErr } = await supabase
+        .storage
+        .from('seller-logos')
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+
+      const { data } = supabase.storage.from('seller-logos').getPublicUrl(path);
+      const publicUrl = data?.publicUrl ?? null;
+
+      if (!publicUrl) throw new Error('Não foi possível obter URL pública do logo.');
+
+      setSeller((s) => s ? ({ ...s, logo_url: publicUrl }) : s);
+      await updateSeller({ logo_url: publicUrl });
+    } catch (e: any) {
+      setMsg(e?.message ?? 'Erro ao enviar logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
   async function openStripeOnboarding() {
     if (!sellerId) return;
     setMsg(null);
@@ -247,13 +276,30 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label className="label">Logo do fornecedor (URL)</label>
-              <input
-                className="input"
-                value={seller.logo_url ?? ''}
-                onChange={(e) => setSeller({ ...seller, logo_url: e.target.value })}
-                placeholder="https://.../logo.png"
-              />
+              <label className="label">Logo do fornecedor</label>
+              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                <input
+                  className="input"
+                  value={seller.logo_url ?? ''}
+                  onChange={(e) => setSeller({ ...seller, logo_url: e.target.value })}
+                  placeholder="https://.../logo.png"
+                />
+                <label className="btn secondary" style={{ cursor: 'pointer' }}>
+                  {uploadingLogo ? 'Enviando...' : 'Upload'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadSellerLogo(f);
+                    }}
+                  />
+                </label>
+              </div>
+              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+                PNG/JPEG até 2MB.
+              </div>
             </div>
 
             <div>

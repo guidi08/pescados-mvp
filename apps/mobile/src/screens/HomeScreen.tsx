@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, SafeAreaView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, SafeAreaView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../supabaseClient';
@@ -18,6 +18,7 @@ type Seller = {
   min_order_cents: number;
   shipping_fee_cents: number;
   b2c_enabled: boolean;
+  logo_url?: string | null;
 };
 
 function centsToBRL(cents: number): string {
@@ -37,7 +38,7 @@ export default function HomeScreen() {
 
     const { data, error } = await supabase
       .from('sellers')
-      .select('id, display_name, city, state, active, cutoff_time, min_order_cents, shipping_fee_cents, b2c_enabled')
+      .select('id, display_name, city, state, active, cutoff_time, min_order_cents, shipping_fee_cents, b2c_enabled, logo_url')
       .eq('active', true)
       .order('display_name', { ascending: true });
 
@@ -111,9 +112,14 @@ export default function HomeScreen() {
                     borderColor: colors.border.subtle,
                     alignItems: 'center',
                     justifyContent: 'center',
+                    overflow: 'hidden',
                   }}
                 >
-                  <Text style={textStyle('bodyStrong')}>L</Text>
+                  {item.logo_url ? (
+                    <Image source={{ uri: item.logo_url }} style={{ width: 48, height: 48 }} resizeMode="cover" />
+                  ) : (
+                    <Text style={textStyle('bodyStrong')}>L</Text>
+                  )}
                 </View>
 
                 <View style={{ flex: 1 }}>
