@@ -58,7 +58,18 @@ export default function ProfileScreen() {
   async function contactSupport() {
     const subject = encodeURIComponent('LotePro - Suporte');
     const body = encodeURIComponent('Olá!\n\nPreciso de ajuda com:');
-    await Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+
+    try {
+      const can = await Linking.canOpenURL(url);
+      if (!can) {
+        Alert.alert('Não foi possível abrir o e-mail', `Envie para: ${SUPPORT_EMAIL}`);
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Não foi possível abrir o e-mail', `Envie para: ${SUPPORT_EMAIL}`);
+    }
   }
 
   return (
