@@ -223,13 +223,8 @@ export default function DashboardPage() {
 
     const data = await resp.json();
     if (data?.url) {
-      const win = window.open(data.url, '_blank');
-      if (!win) {
-        window.location.href = data.url;
-        setMsg('Abrindo o onboarding do Stripe...');
-      } else {
-        setMsg('Abrimos o onboarding do Stripe em uma nova aba. Ao concluir, volte aqui e recarregue a página.');
-      }
+      window.location.href = data.url;
+      setMsg('Abrindo o onboarding do Stripe...');
     } else {
       setMsg('Resposta inesperada do servidor ao gerar onboarding.');
     }
