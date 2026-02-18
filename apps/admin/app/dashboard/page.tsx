@@ -223,8 +223,13 @@ export default function DashboardPage() {
 
     const data = await resp.json();
     if (data?.url) {
-      window.open(data.url, '_blank');
-      setMsg('Abrimos o onboarding do Stripe em uma nova aba. Ao concluir, volte aqui e recarregue a página.');
+      const win = window.open(data.url, '_blank');
+      if (!win) {
+        window.location.href = data.url;
+        setMsg('Abrindo o onboarding do Stripe...');
+      } else {
+        setMsg('Abrimos o onboarding do Stripe em uma nova aba. Ao concluir, volte aqui e recarregue a página.');
+      }
     } else {
       setMsg('Resposta inesperada do servidor ao gerar onboarding.');
     }
@@ -337,21 +342,8 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label className="label">Reserva de risco (%)</label>
-              <input
-                className="input"
-                type="number"
-                step="0.1"
-                value={((seller.risk_reserve_bps ?? 0) / 100).toFixed(1)}
-                onChange={(e) => {
-                  const pct = Number(String(e.target.value).replace(',', '.'));
-                  const bps = Number.isFinite(pct) ? Math.max(0, Math.round(pct * 100)) : 0;
-                  setSeller({ ...seller, risk_reserve_bps: bps });
-                }}
-              />
-              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-                Retido por {seller.risk_reserve_days ?? 60} dias e liberado depois (proteção contra chargeback).
-              </div>
+              <!-- removed risk reserve -->
+              {/* reserva de risco removida */}
             </div>
 
             <div>
@@ -429,7 +421,7 @@ export default function DashboardPage() {
               shipping_fee_cents: seller.shipping_fee_cents,
               min_order_cents: seller.min_order_cents,
               b2c_enabled: seller.b2c_enabled,
-              risk_reserve_bps: seller.risk_reserve_bps ?? 0,
+              /* risk_reserve_bps removido */
               delivery_days: seller.delivery_days ?? [1, 2, 3, 4, 5],
             })}>
               Salvar
