@@ -19,8 +19,22 @@ export default function LoginPage() {
         if (error) throw error;
         window.location.href = '/dashboard';
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
+        const redirectTo = `${window.location.origin}/auth/callback`;
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: redirectTo },
+        });
+        if (error) {
+          const msg = String(error.message || '').toLowerCase();
+          if (msg.includes('already registered') || msg.includes('already in use')) {
+            await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+            setMsg('Este e-mail já foi utilizado. Enviamos um e-mail para recuperação de senha.');
+            setMode('login');
+            return;
+          }
+          throw error;
+        }
         setMsg('Conta criada! Verifique seu e-mail (se estiver ativado) e faça login.');
         setMode('login');
       }

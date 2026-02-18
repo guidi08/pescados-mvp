@@ -49,6 +49,9 @@ export default function CartBar({ navigationRef }: { navigationRef: NavigationCo
   const { items, totalCents } = useCart();
   const insets = useSafeAreaInsets();
 
+  // Navigation may not be ready on first render
+  if (!navigationRef.isReady?.()) return null;
+
   const currentRouteName = navigationRef.getCurrentRoute?.()?.name;
   if (currentRouteName && HIDE_ON.has(currentRouteName)) return null;
 
