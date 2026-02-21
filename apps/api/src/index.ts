@@ -87,6 +87,58 @@ app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+// ---- AI pending queue (in-process) ----
+let aiPendingRunning = false;
+async function processPendingAi(batchSize = 25) {
+  if (aiPendingRunning) return;
+  aiPendingRunning = true;
+  try {
+    const { data: pending, error } = await supabaseService
+      .from('products')
+      .select('id, seller_id, name, description, unit, fresh, pricing_mode')
+      .eq('ai_pending', true)
+      .limit(batchSize);
+
+    if (error || !pending?.length) return;
+
+    for (const p of pending) {
+      let classification;
+      try {
+        classification = await classifyProductWithOpenAI({
+          name: p.name,
+          description: p.description,
+          unit: p.unit,
+          fresh: p.fresh,
+          pricing_mode: p.pricing_mode,
+        });
+      } catch (e) {
+        classification = fallbackClassification({ name: p.name, fresh: p.fresh });
+      }
+
+      await supabaseService
+        .from('products')
+        .update({
+          ai_normalized_name: classification.normalized_name,
+          ai_category: classification.category,
+          ai_subcategory: classification.subcategory,
+          ai_menu_group: classification.menu_group,
+          ai_tags: classification.tags,
+          ai_confidence: classification.confidence,
+          ai_updated_at: new Date().toISOString(),
+          ai_pending: false,
+        })
+        .eq('id', p.id);
+    }
+  } finally {
+    aiPendingRunning = false;
+  }
+}
+
+// run every 60s
+setInterval(() => {
+  processPendingAi().catch((e) => console.warn('AI pending error', e));
+}, 60 * 1000);
+
 /**
  * ---------- AI: Auto classification ----------
  */
