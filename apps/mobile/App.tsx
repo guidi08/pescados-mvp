@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import EntryScreen from './src/screens/EntryScreen';
 import SupplierAccessScreen from './src/screens/SupplierAccessScreen';
@@ -120,9 +121,10 @@ export default function App() {
   }, []);
 
   return (
-    <BuyerProvider>
-      <CartProvider>
-        <NavigationContainer ref={navigationRef} linking={linking as any} onReady={() => setNavReady(true)}>
+    <SafeAreaProvider>
+      <BuyerProvider>
+        <CartProvider>
+          <NavigationContainer ref={navigationRef} linking={linking as any} onReady={() => setNavReady(true)}>
           <Stack.Navigator
             screenOptions={{
               headerShown: false,
@@ -231,5 +233,6 @@ export default function App() {
         </NavigationContainer>
       </CartProvider>
     </BuyerProvider>
+  </SafeAreaProvider>
   );
 }
