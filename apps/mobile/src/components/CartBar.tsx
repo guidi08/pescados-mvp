@@ -46,18 +46,24 @@ const HIDE_ON = new Set([
 
 const TAB_ROUTES = new Set(['SellersTab', 'ProductsTab', 'ProfileTab']);
 
-export default function CartBar({ navigationRef }: { navigationRef: NavigationContainerRef<any> }) {
+export default function CartBar({
+  navigationRef,
+  currentRouteName,
+}: {
+  navigationRef: NavigationContainerRef<any>;
+  currentRouteName?: string | null;
+}) {
   const { items, sellerName, subtotalCents } = useCart();
   const insets = useSafeAreaInsets();
 
-  const currentRouteName = navigationRef.getCurrentRoute?.()?.name;
-  if (currentRouteName && HIDE_ON.has(currentRouteName)) return null;
+  const routeName = currentRouteName ?? navigationRef.getCurrentRoute?.()?.name;
+  if (routeName && HIDE_ON.has(routeName)) return null;
   if (!items.length) return null;
 
   const kg = useMemo(() => estimateCartKg(items as any), [items]);
 
   const bottomOffset =
-    currentRouteName && TAB_ROUTES.has(currentRouteName)
+    routeName && TAB_ROUTES.has(routeName)
       ? (insets.bottom || 0) + 64
       : (insets.bottom || 0) + 8;
 

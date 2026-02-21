@@ -104,6 +104,7 @@ function TabNavigator() {
 export default function App() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
   const [navReady, setNavReady] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState<string | null>(null);
 
   // Deep linking for Supabase auth callback
   const linking = {
@@ -124,7 +125,19 @@ export default function App() {
     <SafeAreaProvider>
       <BuyerProvider>
         <CartProvider>
-          <NavigationContainer ref={navigationRef} linking={linking as any} onReady={() => setNavReady(true)}>
+          <NavigationContainer
+            ref={navigationRef}
+            linking={linking as any}
+            onReady={() => {
+              setNavReady(true);
+              const name = navigationRef.current?.getCurrentRoute?.()?.name ?? null;
+              setCurrentRoute(name);
+            }}
+            onStateChange={() => {
+              const name = navigationRef.current?.getCurrentRoute?.()?.name ?? null;
+              setCurrentRoute(name);
+            }}
+          >
           <Stack.Navigator
             screenOptions={{
               headerShown: false,
@@ -229,7 +242,9 @@ export default function App() {
           </Stack.Navigator>
 
           {/* Sticky iFood-like bar */}
-          {navReady && navigationRef.current ? <CartBar navigationRef={navigationRef.current} /> : null}
+          {navReady && navigationRef.current ? (
+            <CartBar navigationRef={navigationRef.current} currentRouteName={currentRoute} />
+          ) : null}
         </NavigationContainer>
       </CartProvider>
     </BuyerProvider>
