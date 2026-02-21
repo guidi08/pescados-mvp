@@ -51,7 +51,7 @@ const CATEGORY_TILES: Array<{
     subtitle: 'Cortes e caixas',
     icon: 'grid-outline',
     bg: '#FF9F0A',
-    category: 'Pescados',
+    category: 'Peixes',
     freshFilter: 'all',
   },
   {
@@ -60,7 +60,7 @@ const CATEGORY_TILES: Array<{
     subtitle: 'Camarão, polvo',
     icon: 'water-outline',
     bg: '#0A84FF',
-    category: 'Frutos do mar',
+    category: 'Mariscos',
     freshFilter: 'all',
   },
   {
@@ -69,7 +69,7 @@ const CATEGORY_TILES: Array<{
     subtitle: 'Premium',
     icon: 'sparkles-outline',
     bg: '#34C759',
-    category: 'Iguarias',
+    category: 'Outros',
     freshFilter: 'all',
   },
   {
