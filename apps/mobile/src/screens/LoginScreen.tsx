@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import type { RootStackParamList } from '../../App';
 import { supabase } from '../supabaseClient';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { colors, spacing, textStyle } from '../theme';
 
-export default function LoginScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+
+export default function LoginScreen({ navigation }: Props) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
 
   const [email, setEmail] = useState('');
@@ -27,6 +31,7 @@ export default function LoginScreen() {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       } else {
         const redirectTo = (process.env.EXPO_PUBLIC_EMAIL_REDIRECT_URL?.trim() || Linking.createURL('auth/callback'));
 
