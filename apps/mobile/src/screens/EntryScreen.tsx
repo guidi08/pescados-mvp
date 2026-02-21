@@ -19,8 +19,15 @@ export default function EntryScreen({ navigation }: Props) {
         </View>
 
         <View style={{ gap: spacing['2'] }}>
-          <Button title="Entrar como comprador" onPress={() => navigation.navigate('Login', { role: 'buyer' })} />
-          <Button title="Sou fornecedor" variant="secondary" onPress={() => navigation.navigate('SupplierAccess')} />
+          <Button
+            title="Entrar como comprador"
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login', params: { role: 'buyer' } }] })}
+          />
+          <Button
+            title="Sou fornecedor"
+            variant="secondary"
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'SupplierAccess' }] })}
+          />
         </View>
 
         <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['3'] }]}
