@@ -53,6 +53,39 @@ export default function NewProductPage() {
     })();
   }, []);
 
+
+  async function triggerAi(productId: string) {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!apiBase) {
+      console.warn('Faltou NEXT_PUBLIC_API_BASE_URL no ambiente do portal.');
+      return false;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      console.warn('Sessão expirada.');
+      return false;
+    }
+
+    const resp = await fetch(`${apiBase}/ai/classify-product`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ productId }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      console.warn('AI classify failed', err);
+      return false;
+    }
+
+    return true;
+  }
+
   async function createProduct() {
     if (!sellerId) return;
     setMsg(null);
@@ -94,6 +127,7 @@ export default function NewProductPage() {
       return;
     }
 
+    await triggerAi(data.id);
     window.location.href = `/dashboard/products/${data.id}`;
   }
 

@@ -56,11 +56,46 @@ export default function ProductDetailPage({ params }: any) {
 
   const isVariableWeight = product?.pricing_mode === 'per_kg_box';
 
+
+  async function triggerAi(productId: string) {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!apiBase) {
+      console.warn('Faltou NEXT_PUBLIC_API_BASE_URL no ambiente do portal.');
+      return false;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      console.warn('Sessão expirada.');
+      return false;
+    }
+
+    const resp = await fetch(`${apiBase}/ai/classify-product`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ productId }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      console.warn('AI classify failed', err);
+      return false;
+    }
+
+    return true;
+  }
+
   async function updateProduct(patch: any) {
     setMsg(null);
     const { error } = await supabase.from('products').update(patch).eq('id', productId);
     if (error) setMsg(error.message);
     else {
+      const shouldClassify = ['name', 'description', 'unit', 'fresh', 'pricing_mode'].some((k) => k in patch);
+      if (shouldClassify) await triggerAi(productId);
       setMsg('Produto atualizado ✅');
       await load();
     }
