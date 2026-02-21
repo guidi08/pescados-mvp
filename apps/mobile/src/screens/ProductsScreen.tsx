@@ -182,7 +182,13 @@ export default function ProductsScreen() {
 
     return products.filter((p) => {
       if (!p.active) return false;
-      if (category !== 'Todos' && (p.category ?? '—') !== category) return false;
+      if (category !== 'Todos') {
+        const cat = p.category ?? '—';
+        if (category === 'Pescados' && cat !== 'Peixes') return false;
+        if (category === 'Iguarias' && cat !== 'Outros') return false;
+        if (category === 'Frutos do mar' && !['Camarão', 'Crustáceos', 'Mariscos'].includes(cat)) return false;
+        if (!['Pescados', 'Iguarias', 'Frutos do mar'].includes(category) && cat !== category) return false;
+      }
       if (freshFilter === 'fresh' && !p.fresh) return false;
       if (freshFilter === 'frozen' && p.fresh) return false;
 
