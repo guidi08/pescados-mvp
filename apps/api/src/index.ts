@@ -8,6 +8,7 @@ import { supabaseService } from './supabase';
 import { stripe } from './stripe';
 import { formatBRL } from './utils';
 import { sendOrderEmail } from './email';
+import { classifyProductWithOpenAI, fallbackClassification } from './ai';
 
 const app = express();
 
@@ -85,6 +86,125 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+/**
+ * ---------- AI: Auto classification ----------
+ */
+const classifySchema = z.object({
+  productId: z.string().uuid(),
+});
+
+app.post('/ai/classify-product', requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = classifySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+
+  const userId = req.user!.id;
+  const { productId } = parsed.data;
+
+  const { data: profile } = await supabaseService.from('profiles').select('role,seller_id').eq('id', userId).single();
+  const isAdmin = profile?.role === 'admin';
+
+  const { data: product, error: prodErr } = await supabaseService
+    .from('products')
+    .select('id, seller_id, name, description, unit, fresh, pricing_mode')
+    .eq('id', productId)
+    .single();
+
+  if (prodErr || !product) return res.status(404).json({ error: 'product_not_found' });
+  if (!isAdmin && profile?.seller_id !== product.seller_id) return res.status(403).json({ error: 'forbidden' });
+
+  let classification;
+  try {
+    classification = await classifyProductWithOpenAI({
+      name: product.name,
+      description: product.description,
+      unit: product.unit,
+      fresh: product.fresh,
+      pricing_mode: product.pricing_mode,
+    });
+  } catch (e) {
+    console.warn('AI classify failed, using fallback:', e);
+    classification = fallbackClassification({ name: product.name, fresh: product.fresh });
+  }
+
+  const { error: updErr } = await supabaseService
+    .from('products')
+    .update({
+      ai_normalized_name: classification.normalized_name,
+      ai_category: classification.category,
+      ai_subcategory: classification.subcategory,
+      ai_menu_group: classification.menu_group,
+      ai_tags: classification.tags,
+      ai_confidence: classification.confidence,
+      ai_updated_at: new Date().toISOString(),
+    })
+    .eq('id', product.id);
+
+  if (updErr) return res.status(500).json({ error: 'ai_update_failed' });
+
+  return res.json({ ok: true, productId: product.id, classification });
+});
+
+const reclassifySchema = z.object({
+  sellerId: z.string().uuid().optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+});
+
+app.post('/jobs/ai/reclassify-products', async (req, res) => {
+  const jobSecret = process.env.JOB_SECRET;
+  const provided = req.headers['x-job-secret'];
+  if (!jobSecret || !provided || Array.isArray(provided) || provided !== jobSecret) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  const parsed = reclassifySchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+
+  const { sellerId, limit = 50 } = parsed.data;
+
+  let query = supabaseService
+    .from('products')
+    .select('id, seller_id, name, description, unit, fresh, pricing_mode')
+    .limit(limit);
+
+  if (sellerId) query = query.eq('seller_id', sellerId);
+
+  const { data: products, error } = await query;
+  if (error) return res.status(500).json({ error: 'products_fetch_error' });
+
+  let updated = 0;
+  for (const p of products ?? []) {
+    let classification;
+    try {
+      classification = await classifyProductWithOpenAI({
+        name: p.name,
+        description: p.description,
+        unit: p.unit,
+        fresh: p.fresh,
+        pricing_mode: p.pricing_mode,
+      });
+    } catch (e) {
+      classification = fallbackClassification({ name: p.name, fresh: p.fresh });
+    }
+
+    const { error: updErr } = await supabaseService
+      .from('products')
+      .update({
+        ai_normalized_name: classification.normalized_name,
+        ai_category: classification.category,
+        ai_subcategory: classification.subcategory,
+        ai_menu_group: classification.menu_group,
+        ai_tags: classification.tags,
+        ai_confidence: classification.confidence,
+        ai_updated_at: new Date().toISOString(),
+      })
+      .eq('id', p.id);
+
+    if (!updErr) updated += 1;
+  }
+
+  return res.json({ ok: true, updated, checked: products?.length ?? 0 });
+});
 
 /**
  * ---------- Orders ----------
@@ -580,49 +700,44 @@ app.post('/wallet/topup/pix', requireAuth, async (req: AuthedRequest, res) => {
 const sellerOnboardingSchema = z.object({ sellerId: z.string().uuid() });
 
 app.post('/sellers/stripe/onboarding-link', requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const parsed = sellerOnboardingSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
+  const parsed = sellerOnboardingSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
 
-    const { sellerId } = parsed.data;
-    const userId = req.user!.id;
+  const { sellerId } = parsed.data;
+  const userId = req.user!.id;
 
-    // Ensure user belongs to this seller (or admin)
-    const { data: profile } = await supabaseService.from('profiles').select('role, seller_id').eq('id', userId).single();
-    const isAdmin = profile?.role === 'admin';
-    if (!isAdmin && profile?.seller_id !== sellerId) {
-      return res.status(403).json({ error: 'forbidden' });
-    }
-
-    const { data: seller } = await supabaseService.from('sellers').select('*').eq('id', sellerId).single();
-    if (!seller) return res.status(404).json({ error: 'seller_not_found' });
-
-    let stripeAccountId = seller.stripe_account_id as string | null;
-
-    if (!stripeAccountId) {
-      const acct = await stripe.accounts.create({
-        type: 'express',
-        country: 'BR',
-        capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-        business_type: 'company',
-        metadata: { seller_id: sellerId },
-      });
-      stripeAccountId = acct.id;
-      await supabaseService.from('sellers').update({ stripe_account_id: stripeAccountId }).eq('id', sellerId);
-    }
-
-    const accountLink = await stripe.accountLinks.create({
-      account: stripeAccountId,
-      refresh_url: `${env.ADMIN_BASE_URL}/dashboard`,
-      return_url: `${env.ADMIN_BASE_URL}/dashboard`,
-      type: 'account_onboarding',
-    });
-
-    return res.json({ url: accountLink.url, stripeAccountId });
-  } catch (e: any) {
-    console.error('stripe_onboarding_error', e?.message ?? e);
-    return res.status(500).json({ error: 'stripe_onboarding_error', message: e?.message ?? String(e) });
+  // Ensure user belongs to this seller (or admin)
+  const { data: profile } = await supabaseService.from('profiles').select('role, seller_id').eq('id', userId).single();
+  const isAdmin = profile?.role === 'admin';
+  if (!isAdmin && profile?.seller_id !== sellerId) {
+    return res.status(403).json({ error: 'forbidden' });
   }
+
+  const { data: seller } = await supabaseService.from('sellers').select('*').eq('id', sellerId).single();
+  if (!seller) return res.status(404).json({ error: 'seller_not_found' });
+
+  let stripeAccountId = seller.stripe_account_id as string | null;
+
+  if (!stripeAccountId) {
+    const acct = await stripe.accounts.create({
+      type: 'express',
+      country: 'BR',
+      capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+      business_type: 'company',
+      metadata: { seller_id: sellerId },
+    });
+    stripeAccountId = acct.id;
+    await supabaseService.from('sellers').update({ stripe_account_id: stripeAccountId }).eq('id', sellerId);
+  }
+
+  const accountLink = await stripe.accountLinks.create({
+    account: stripeAccountId,
+    refresh_url: `${env.ADMIN_BASE_URL}/dashboard`,
+    return_url: `${env.ADMIN_BASE_URL}/dashboard`,
+    type: 'account_onboarding',
+  });
+
+  return res.json({ url: accountLink.url, stripeAccountId });
 });
 
 /**

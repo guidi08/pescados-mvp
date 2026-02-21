@@ -28,6 +28,10 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('LotePro <no-reply@seudominio.com.br>'),
+
+  // AI
+  OPENAI_API_KEY: z.string().min(10).optional(),
+  OPENAI_MODEL: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
