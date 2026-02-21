@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform, UIManager } from 'react-native';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -102,6 +102,7 @@ function TabNavigator() {
 
 export default function App() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const [navReady, setNavReady] = useState(false);
 
   // Deep linking for Supabase auth callback
   const linking = {
@@ -121,7 +122,7 @@ export default function App() {
   return (
     <BuyerProvider>
       <CartProvider>
-        <NavigationContainer ref={navigationRef} linking={linking as any}>
+        <NavigationContainer ref={navigationRef} linking={linking as any} onReady={() => setNavReady(true)}>
           <Stack.Navigator
             screenOptions={{
               headerShown: false,
@@ -226,7 +227,7 @@ export default function App() {
           </Stack.Navigator>
 
           {/* Sticky iFood-like bar */}
-          {navigationRef.current ? <CartBar navigationRef={navigationRef.current} /> : null}
+          {navReady && navigationRef.current ? <CartBar navigationRef={navigationRef.current} /> : null}
         </NavigationContainer>
       </CartProvider>
     </BuyerProvider>
