@@ -38,6 +38,7 @@ export default function Button({
           backgroundColor: pressed && !disabled && v.bgPressed ? resolveColor(v.bgPressed) : bg,
           borderColor: v.border ? resolveColor(v.border) : 'transparent',
           borderWidth: v.border ? StyleSheet.hairlineWidth : 0,
+          transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
         },
       ]}
     >

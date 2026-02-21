@@ -1,112 +1,263 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+
 import { supabase } from '../supabaseClient';
-import Button from '../components/Button';
+import { useCart } from '../context/CartContext';
 import Card from '../components/Card';
+import Badge from '../components/Badge';
 import { colors, spacing, textStyle } from '../theme';
 
-type Order = {
+type OrderItem = {
+  product_id: string;
+  variant_id: string | null;
+  product_name_snapshot: string;
+  variant_name_snapshot: string | null;
+  unit_snapshot: string;
+  pricing_mode_snapshot: 'per_unit' | 'per_kg_box';
+  unit_price_cents_snapshot: number;
+  quantity: number;
+  estimated_total_weight_kg_snapshot: number | null;
+};
+
+type OrderRow = {
   id: string;
+  created_at: string;
   status: string;
   payment_status: string;
   total_cents: number;
-  delivery_date: string | null;
-  created_at: string;
+  contains_fresh: boolean;
+  seller_id: string;
+  sellers?: { display_name: string } | null;
+  order_items?: OrderItem[];
 };
 
 function centsToBRL(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function OrdersScreen({ navigation }: any) {
-  const [orders, setOrders] = useState<Order[]>([]);
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function statusLabel(o: OrderRow): { label: string; variant: any } {
+  if (o.status === 'canceled') return { label: 'Cancelado', variant: 'neutral' };
+  if (o.payment_status === 'processing') return { label: 'Processando pagamento', variant: 'neutral' };
+  if (o.payment_status === 'failed') return { label: 'Pagamento falhou', variant: 'variable' };
+  if (o.payment_status === 'unpaid' || o.status === 'pending_payment') return { label: 'Pagamento não confirmado', variant: 'variable' };
+  if (o.status === 'paid') return { label: 'Pago', variant: 'fresh' };
+  if (o.status === 'fulfilled') return { label: 'Concluído', variant: 'fresh' };
+  return { label: o.status, variant: 'neutral' };
+}
+
+export default function OrdersScreen() {
+  const navigation = useNavigation<any>();
+  const { addItem, clear } = useCart();
+
   const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
 
   async function load() {
     setLoading(true);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    if (!userId) return;
 
-    const { data, error } = await supabase
+    const { data: sess } = await supabase.auth.getSession();
+    const user = sess.session?.user;
+    if (!user) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data } = await supabase
       .from('orders')
-      .select('id,status,payment_status,total_cents,delivery_date,created_at')
-      .eq('buyer_id', userId)
-      .order('created_at', { ascending: false });
+      .select(
+        [
+          'id,created_at,status,payment_status,total_cents,contains_fresh,seller_id',
+          'sellers(display_name)',
+          'order_items(product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_snapshot,pricing_mode_snapshot,unit_price_cents_snapshot,quantity,estimated_total_weight_kg_snapshot)',
+        ].join(',')
+      )
+      .eq('buyer_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-    if (!error) setOrders((data ?? []) as any);
+    setOrders((data ?? []) as any);
     setLoading(false);
   }
 
   useEffect(() => {
     load();
 
-    const channel = supabase
+    const realtime = supabase
       .channel('realtime-orders')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => load())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(realtime);
     };
   }, []);
 
-  async function showDetails(orderId: string) {
-    const { data: items } = await supabase
-      .from('order_items')
-      .select('product_name_snapshot, variant_name_snapshot, quantity, unit_snapshot, unit_price_cents_snapshot, pricing_mode_snapshot, estimated_total_weight_kg_snapshot, line_total_cents_snapshot')
-      .eq('order_id', orderId);
+  const grouped = useMemo(() => {
+    // simple grouping by date string
+    const groups: Array<{ type: 'header' | 'order'; key: string; date?: string; order?: OrderRow }> = [];
+    let lastDate = '';
 
-    const lines = (items ?? []).map((i: any) => {
-      const name = `${i.product_name_snapshot}${i.variant_name_snapshot ? ` (${i.variant_name_snapshot})` : ''}`;
-
-      if (i.pricing_mode_snapshot === 'per_kg_box') {
-        const boxes = i.quantity;
-        const estW = i.estimated_total_weight_kg_snapshot ?? '—';
-        const priceKg = centsToBRL(i.unit_price_cents_snapshot);
-        const total = centsToBRL(i.line_total_cents_snapshot);
-        return `• ${name} — ${boxes} cx • ~${estW} kg • ${priceKg}/kg • Total est.: ${total}`;
+    for (const o of orders) {
+      const date = fmtDate(new Date(o.created_at));
+      if (date !== lastDate) {
+        groups.push({ type: 'header', key: `h:${date}`, date });
+        lastDate = date;
       }
+      groups.push({ type: 'order', key: `o:${o.id}`, order: o });
+    }
 
-      const qty = `${i.quantity} ${i.unit_snapshot}`;
-      const price = centsToBRL(i.unit_price_cents_snapshot);
-      const total = centsToBRL(i.line_total_cents_snapshot);
-      return `• ${name} — ${qty} — ${price}/${i.unit_snapshot} • Total: ${total}`;
-    }).join('\n');
+    return groups;
+  }, [orders]);
 
-    Alert.alert('Itens do pedido', lines || 'Sem itens');
+  function reorder(o: OrderRow) {
+    const sellerName = o.sellers?.display_name ?? 'Fornecedor';
+
+    // iFood-style: 1 seller per cart → limpar e adicionar
+    clear();
+
+    for (const it of o.order_items ?? []) {
+      // Recover an estimated "box weight" from total snapshot when pricing_mode is per_kg_box
+      const estimatedBoxWeightKg =
+        it.pricing_mode_snapshot === 'per_kg_box' && it.estimated_total_weight_kg_snapshot && it.quantity
+          ? Number(it.estimated_total_weight_kg_snapshot) / Number(it.quantity)
+          : null;
+
+      addItem(o.seller_id, sellerName, {
+        productId: it.product_id,
+        variantId: it.variant_id,
+        productName: it.product_name_snapshot,
+        variantName: it.variant_name_snapshot,
+        unit: it.unit_snapshot,
+        pricingMode: it.pricing_mode_snapshot,
+        unitPriceCents: it.unit_price_cents_snapshot,
+        quantity: Number(it.quantity ?? 1),
+        estimatedBoxWeightKg,
+        maxWeightVariationPct: 10,
+      });
+    }
+
+    navigation.navigate('Cart');
   }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
-      <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
-        <Text style={textStyle('h1')}>Meus pedidos</Text>
-        <Button title="Voltar" onPress={() => navigation.goBack()} size="sm" variant="secondary" />
-        {loading ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Carregando...</Text> : null}
+      <View style={{ paddingHorizontal: spacing['4'], paddingTop: spacing['3'], paddingBottom: spacing['2'] }}>
+        <Text style={textStyle('h1')}>Histórico</Text>
+        <Text style={[textStyle('caption'), { color: colors.text.secondary, marginTop: 6 }]}
+        >
+          Seus pedidos mais recentes
+        </Text>
+        {loading ? <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>Carregando...</Text> : null}
       </View>
 
       <FlatList
-        data={orders}
-        keyExtractor={(o) => o.id}
-        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}
-        renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => showDetails(item.id)}>
-            <Card>
-              <Text style={textStyle('h3')}>Pedido {item.id.slice(0, 8)}...</Text>
-              <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}
-              >
-                Status: {item.status} • Pagamento: {item.payment_status}
-              </Text>
-              <Text style={[textStyle('bodyStrong'), { marginTop: spacing['2'] }]}>{centsToBRL(item.total_cents)}</Text>
-              {item.delivery_date ? (
-                <Text style={[textStyle('small'), { color: colors.text.secondary }]}
-                >Entrega: {item.delivery_date}</Text>
-              ) : null}
-            </Card>
-          </TouchableOpacity>
-        )}
+        data={grouped}
+        keyExtractor={(i) => i.key}
+        contentContainerStyle={{ paddingHorizontal: spacing['4'], paddingBottom: 24 }}
+        renderItem={({ item }) => {
+          if (item.type === 'header') {
+            return (
+              <View style={{ paddingTop: spacing['3'], paddingBottom: spacing['2'] }}>
+                <Text style={[textStyle('label'), { color: colors.text.secondary }]}>{item.date}</Text>
+              </View>
+            );
+          }
+
+          const o = item.order as OrderRow;
+          const sellerName = o.sellers?.display_name ?? 'Fornecedor';
+          const first = (o.order_items ?? [])[0];
+          const status = statusLabel(o);
+
+          return (
+            <View style={{ paddingBottom: spacing['3'] }}>
+              <Card style={{ padding: spacing['3'] }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing['3'] }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: colors.background.surface,
+                      borderWidth: 1,
+                      borderColor: colors.border.subtle,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="storefront" size={20} color={colors.text.primary} />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={textStyle('h3')}>{sellerName}</Text>
+                      <Badge label={status.label} variant={status.variant} />
+                    </View>
+
+                    <Text style={[textStyle('caption'), { color: colors.text.secondary, marginTop: 4 }]}
+                    >
+                      {first ? `${first.product_name_snapshot}${first.variant_name_snapshot ? ` • ${first.variant_name_snapshot}` : ''}` : '—'}
+                    </Text>
+
+                    <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: 4 }]}
+                    >
+                      Total: {centsToBRL(o.total_cents)}
+                      {o.contains_fresh ? ' • contém fresco' : ''}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: spacing['3'], marginTop: spacing['3'] }}>
+                  <Pressable
+                    onPress={() => navigation.navigate('OrderDetail', { orderId: o.id })}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: colors.brand.primary,
+                      alignItems: 'center',
+                      opacity: pressed ? 0.85 : 1,
+                    })}
+                  >
+                    <Text style={[textStyle('bodyStrong'), { color: colors.brand.primary }]}>Ver detalhes</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => reorder(o)}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 14,
+                      backgroundColor: pressed ? colors.brand.primaryDark : colors.brand.primary,
+                      alignItems: 'center',
+                    })}
+                  >
+                    <Text style={[textStyle('bodyStrong'), { color: colors.text.inverse }]}>Adicionar à sacola</Text>
+                  </Pressable>
+                </View>
+              </Card>
+            </View>
+          );
+        }}
         ListEmptyComponent={!loading ? (
-          <Text style={{ padding: spacing['4'], color: colors.text.secondary }}>Nenhum pedido ainda.</Text>
+          <View style={{ paddingVertical: spacing['5'] }}>
+            <Text style={textStyle('h2')}>Sem pedidos ainda</Text>
+            <Text style={[textStyle('body'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>
+              Quando você fizer um pedido, ele aparece aqui.
+            </Text>
+          </View>
         ) : null}
       />
     </SafeAreaView>

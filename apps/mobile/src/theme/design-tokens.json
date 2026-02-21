@@ -21,20 +21,20 @@
       "900": "#0F1720"
     },
     "background": {
-      "app": "#F7F8FA",
+      "app": "#FFFFFF",
       "surface": "#FFFFFF",
       "elevated": "#FFFFFF"
     },
     "text": {
       "primary": "#0F1720",
-      "secondary": "#4B5565",
-      "tertiary": "#6B7687",
+      "secondary": "#6B6B6B",
+      "tertiary": "#8E8E93",
       "inverse": "#FFFFFF",
       "link": "#EA1D2C"
     },
     "border": {
-      "subtle": "#EEF0F3",
-      "default": "#D9DEE5",
+      "subtle": "#EAEAEA",
+      "default": "#DDDDDD",
       "strong": "#B6BEC9",
       "focus": "#EA1D2C"
     },
@@ -271,7 +271,7 @@
       "bg": "{colors.background.surface}",
       "border": "{colors.border.subtle}",
       "padding": 16,
-      "shadow": "sm"
+      "shadow": "none"
     },
     "badge": {
       "radius": "pill",

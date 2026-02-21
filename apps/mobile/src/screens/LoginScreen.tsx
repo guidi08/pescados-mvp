@@ -28,7 +28,7 @@ export default function LoginScreen() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const redirectTo = Linking.createURL('auth/callback');
+        const redirectTo = (process.env.EXPO_PUBLIC_EMAIL_REDIRECT_URL?.trim() || Linking.createURL('auth/callback'));
 
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -44,19 +44,7 @@ export default function LoginScreen() {
             },
           },
         });
-        if (error) {
-          const msg = String(error.message || '').toLowerCase();
-          if (msg.includes('already registered') || msg.includes('already in use')) {
-            await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-            Alert.alert(
-              'E-mail já usado',
-              'Este e-mail já foi utilizado. Enviamos um e-mail para recuperação de senha.'
-            );
-            setMode('login');
-            return;
-          }
-          throw error;
-        }
+        if (error) throw error;
 
         // If email confirmation is OFF, we might already have a session.
         if (data.session?.user?.id) {

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { LayoutAnimation } from 'react-native';
 
 import { supabase } from '../supabaseClient';
 
@@ -86,7 +87,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const totalCents = subtotalCents + shippingFeeCents;
 
+  function animateNext() {
+    // Lightweight micro-transition (cart add/remove/qty)
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }
+
   function addItem(sellerId: string, sellerName: string, item: CartItem) {
+    animateNext();
     setState((prev) => {
       // Enforce 1 seller per cart (estilo iFood)
       if (prev.sellerId && prev.sellerId !== sellerId) {
@@ -105,6 +112,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   function updateQuantity(productId: string, variantId: string | null | undefined, quantity: number) {
+    animateNext();
     setState((prev) => {
       const items = prev.items
         .map((i) => {
@@ -124,6 +132,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   function clear() {
+    animateNext();
     setState({ sellerId: null, sellerName: null, items: [] });
   }
 
