@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
 
 import { supabase } from '../supabaseClient';
 import { useBuyer } from '../context/BuyerContext';
@@ -9,6 +10,9 @@ import Card from '../components/Card';
 import { colors, spacing, textStyle } from '../theme';
 
 const SUPPORT_EMAIL = 'suporte@guestengine.io';
+const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL || 'https://lotepro.com.br/termos';
+const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL || 'https://lotepro.com.br/privacidade';
+const REFUND_URL = process.env.EXPO_PUBLIC_REFUND_URL || 'https://lotepro.com.br/cancelamento';
 
 function MenuItem({
   icon,
@@ -127,8 +131,17 @@ export default function ProfileScreen() {
           <MenuItem
             icon="person-circle-outline"
             title="Dados da conta"
-            subtitle="Telefone, endereço e informações"
+            subtitle="Telefone, CPF/CNPJ e informações"
             onPress={() => navigation.navigate('Account')}
+          />
+
+          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+
+          <MenuItem
+            icon="location-outline"
+            title="Endereço de entrega"
+            subtitle="Obrigatório para B2C"
+            onPress={() => navigation.navigate('Address')}
           />
 
           {channel === 'b2b' ? (
@@ -150,8 +163,41 @@ export default function ProfileScreen() {
             title="Suporte"
             subtitle={SUPPORT_EMAIL}
             onPress={() => {
-              Alert.alert('Suporte', `Envie um e-mail para ${SUPPORT_EMAIL}`);
+              Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
             }}
+          />
+
+          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+
+          <MenuItem
+            icon="document-text-outline"
+            title="Termos de Uso"
+            onPress={() => Linking.openURL(TERMS_URL)}
+          />
+
+          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+
+          <MenuItem
+            icon="shield-checkmark-outline"
+            title="Política de Privacidade"
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+          />
+
+          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+
+          <MenuItem
+            icon="refresh-outline"
+            title="Cancelamento/Reembolso"
+            onPress={() => Linking.openURL(REFUND_URL)}
+          />
+
+          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+
+          <MenuItem
+            icon="trash-outline"
+            title="Excluir conta"
+            subtitle="Solicitar exclusão"
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Excluir%20conta%20LotePro`)}
           />
         </Card>
 

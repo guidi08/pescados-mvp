@@ -291,6 +291,10 @@ app.post('/orders', requireAuth, async (req: AuthedRequest, res) => {
 
   const buyerChannel: 'b2b' | 'b2c' = buyerProfile?.cnpj ? 'b2b' : 'b2c';
 
+  if (buyerChannel === 'b2c' && !deliveryAddress) {
+    return res.status(400).json({ error: 'missing_delivery_address' });
+  }
+
   // B2B: block new orders if buyer has negative wallet balance (peso variável pendente).
   if (buyerChannel === 'b2b') {
     await ensureBuyerWallet(buyerId);

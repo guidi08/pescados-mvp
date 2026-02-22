@@ -4,6 +4,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { useCart } from '../context/CartContext';
 import { createOrder, createPaymentSheet, createPixPayment } from '../api';
 import { supabase } from '../supabaseClient';
+import { useBuyer } from '../context/BuyerContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { colors, spacing, textStyle } from '../theme';
@@ -22,6 +23,7 @@ type Seller = {
 export default function CheckoutScreen({ navigation }: any) {
   const { items, sellerId, clear, subtotalCents } = useCart();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { channel, profile } = useBuyer();
 
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,7 +55,16 @@ export default function CheckoutScreen({ navigation }: any) {
   const shippingEstimateCents = seller?.shipping_fee_cents ?? 0;
   const totalEstimateCents = subtotalCents + shippingEstimateCents;
 
+  const address = (profile as any)?.address ?? null;
+  const hasAddress = address && address.street && address.city && address.state && address.postal_code;
+
   async function payWithCard() {
+    if (channel === 'b2c' && !hasAddress) {
+      Alert.alert('Endereço obrigatório', 'Informe o endereço de entrega para continuar.');
+      navigation.navigate('Address');
+      return;
+    }
+
     setLoading(true);
     try {
       // 1) Create order
@@ -64,6 +75,7 @@ export default function CheckoutScreen({ navigation }: any) {
           variantId: it.variantId ?? null,
           quantity: it.quantity,
         })),
+        deliveryAddress: channel === 'b2c' ? address : undefined,
         deliveryNotes: notes || undefined,
       });
 
@@ -102,6 +114,12 @@ export default function CheckoutScreen({ navigation }: any) {
   }
 
   async function payWithPix() {
+    if (channel === 'b2c' && !hasAddress) {
+      Alert.alert('Endereço obrigatório', 'Informe o endereço de entrega para continuar.');
+      navigation.navigate('Address');
+      return;
+    }
+
     setLoading(true);
     try {
       const order = await createOrder({
@@ -111,6 +129,7 @@ export default function CheckoutScreen({ navigation }: any) {
           variantId: it.variantId ?? null,
           quantity: it.quantity,
         })),
+        deliveryAddress: channel === 'b2c' ? address : undefined,
         deliveryNotes: notes || undefined,
       });
 
@@ -153,6 +172,19 @@ export default function CheckoutScreen({ navigation }: any) {
               Pedido mínimo: {centsToBRL(seller.min_order_cents)}
             </Text>
           ) : null}
+        </Card>
+
+        <Card>
+          <Text style={textStyle('label')}>Endereço de entrega</Text>
+          <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}
+          >
+            {hasAddress
+              ? `${address.street}, ${address.number || 's/n'} • ${address.neighborhood || ''}\n${address.city}/${address.state} • ${address.postal_code}`
+              : 'Não informado'}
+          </Text>
+          <View style={{ marginTop: spacing['2'] }}>
+            <Button title={hasAddress ? 'Editar endereço' : 'Adicionar endereço'} onPress={() => navigation.navigate('Address')} variant="secondary" />
+          </View>
         </Card>
 
         <Card>

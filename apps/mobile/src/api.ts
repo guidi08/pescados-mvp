@@ -30,6 +30,9 @@ export async function apiRequest<T>(path: string, options: { method?: string; bo
       if (err?.error === 'below_min_order') {
         throw new Error('Pedido abaixo do mínimo do fornecedor.');
       }
+      if (err?.error === 'missing_delivery_address') {
+        throw new Error('Informe o endereço de entrega.');
+      }
       if (err?.error) {
         throw new Error(String(err.error));
       }

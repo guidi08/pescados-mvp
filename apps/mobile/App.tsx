@@ -7,6 +7,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 import EntryScreen from './src/screens/EntryScreen';
 import SupplierAccessScreen from './src/screens/SupplierAccessScreen';
@@ -23,6 +24,7 @@ import PixScreen from './src/screens/PixScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import AddressScreen from './src/screens/AddressScreen';
 import WalletScreen from './src/screens/WalletScreen';
 
 import { CartProvider } from './src/context/CartContext';
@@ -49,6 +51,7 @@ export type RootStackParamList = {
   Orders: undefined;
   OrderDetail: { orderId: string };
   Account: undefined;
+  Address: undefined;
   Wallet: undefined;
 };
 
@@ -105,6 +108,7 @@ export default function App() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
   const [navReady, setNavReady] = useState(false);
   const [currentRoute, setCurrentRoute] = useState<string | null>(null);
+  const stripeKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
 
   // Deep linking for Supabase auth callback
   const linking = {
@@ -123,21 +127,26 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <BuyerProvider>
-        <CartProvider>
-          <NavigationContainer
-            ref={navigationRef}
-            linking={linking as any}
-            onReady={() => {
-              setNavReady(true);
-              const name = navigationRef.current?.getCurrentRoute?.()?.name ?? null;
-              setCurrentRoute(name);
-            }}
-            onStateChange={() => {
-              const name = navigationRef.current?.getCurrentRoute?.()?.name ?? null;
-              setCurrentRoute(name);
-            }}
-          >
+      <StripeProvider
+        publishableKey={stripeKey}
+        merchantIdentifier="merchant.com.guestengine.lotepro"
+        merchantDisplayName="LotePro"
+      >
+        <BuyerProvider>
+          <CartProvider>
+            <NavigationContainer
+              ref={navigationRef}
+              linking={linking as any}
+              onReady={() => {
+                setNavReady(true);
+                const name = navigationRef.current?.getCurrentRoute?.()?.name ?? null;
+                setCurrentRoute(name);
+              }}
+              onStateChange={() => {
+                const name = navigationRef.current?.getCurrentRoute?.()?.name ?? null;
+                setCurrentRoute(name);
+              }}
+            >
           <Stack.Navigator
             screenOptions={{
               headerShown: false,
@@ -229,6 +238,17 @@ export default function App() {
               }}
             />
             <Stack.Screen
+              name="Address"
+              component={AddressScreen}
+              options={{
+                headerShown: true,
+                title: 'Endereço de entrega',
+                headerTintColor: colors.brand.primary,
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: colors.background.surface },
+              }}
+            />
+            <Stack.Screen
               name="Wallet"
               component={WalletScreen}
               options={{
@@ -245,9 +265,10 @@ export default function App() {
           {navReady && navigationRef.current ? (
             <CartBar navigationRef={navigationRef.current} currentRouteName={currentRoute} />
           ) : null}
-        </NavigationContainer>
-      </CartProvider>
-    </BuyerProvider>
-  </SafeAreaProvider>
+            </NavigationContainer>
+          </CartProvider>
+        </BuyerProvider>
+      </StripeProvider>
+    </SafeAreaProvider>
   );
 }

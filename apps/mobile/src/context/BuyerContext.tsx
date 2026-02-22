@@ -13,6 +13,16 @@ export type BuyerProfile = {
   cnpj: string | null;
   company_name: string | null;
   seller_id: string | null;
+  address?: {
+    street?: string | null;
+    number?: string | null;
+    neighborhood?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postal_code?: string | null;
+    complement?: string | null;
+    reference?: string | null;
+  } | null;
 };
 
 type BuyerContextValue = {
@@ -83,7 +93,7 @@ export function BuyerProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, role, full_name, phone, cpf, cnpj, company_name, seller_id')
+      .select('id, email, role, full_name, phone, cpf, cnpj, company_name, seller_id, address')
       .eq('id', userId)
       .single();
 

@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   FlatList,
+  Image,
   Pressable,
   SafeAreaView,
   Text,
@@ -139,11 +140,16 @@ function SellerMiniCard({ s, onPress }: { s: Seller; onPress: () => void }) {
             borderColor: colors.border.subtle,
             alignItems: 'center',
             justifyContent: 'center',
+            overflow: 'hidden',
           }}
         >
-          <Text style={[textStyle('h2'), { color: colors.text.primary }]}>
-            {String(s.display_name ?? '?').slice(0, 1).toUpperCase()}
-          </Text>
+          {s.logo_url ? (
+            <Image source={{ uri: s.logo_url }} style={{ width: 56, height: 56 }} />
+          ) : (
+            <Text style={[textStyle('h2'), { color: colors.text.primary }]}>
+              {String(s.display_name ?? '?').slice(0, 1).toUpperCase()}
+            </Text>
+          )}
         </View>
 
         <View style={{ alignItems: 'center' }}>
@@ -180,11 +186,16 @@ function SellerRow({ s, onPress }: { s: Seller; onPress: () => void }) {
               borderColor: colors.border.subtle,
               alignItems: 'center',
               justifyContent: 'center',
+              overflow: 'hidden',
             }}
           >
-            <Text style={[textStyle('h3'), { color: colors.text.primary }]}>
-              {String(s.display_name ?? '?').slice(0, 1).toUpperCase()}
-            </Text>
+            {s.logo_url ? (
+              <Image source={{ uri: s.logo_url }} style={{ width: 44, height: 44 }} />
+            ) : (
+              <Text style={[textStyle('h3'), { color: colors.text.primary }]}>
+                {String(s.display_name ?? '?').slice(0, 1).toUpperCase()}
+              </Text>
+            )}
           </View>
 
           <View style={{ flex: 1 }}>
