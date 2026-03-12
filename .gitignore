@@ -1,6 +1,7 @@
 node_modules
 .env
 /_archive/
+/supabase/.temp/
 .env.*
 dist
 .next
