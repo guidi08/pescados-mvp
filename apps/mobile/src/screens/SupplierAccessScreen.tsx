@@ -1,12 +1,14 @@
 import React from 'react';
 import { Alert, SafeAreaView, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
+import { useNavigation } from '@react-navigation/native';
 import Button from '../components/Button';
 import { colors, spacing, textStyle } from '../theme';
 
 const SUPPORT_EMAIL = 'suporte@guestengine.io';
 
 export default function SupplierAccessScreen() {
+  const navigation = useNavigation<any>();
   const portalUrl = process.env.EXPO_PUBLIC_SUPPLIER_PORTAL_URL;
 
   async function openPortal() {
@@ -17,7 +19,7 @@ export default function SupplierAccessScreen() {
       );
       return;
     }
-    await Linking.openURL(portalUrl);
+    await Linking.openURL(portalUrl).catch(() => {});
   }
 
   async function requestAccess() {
@@ -25,7 +27,7 @@ export default function SupplierAccessScreen() {
     const body = encodeURIComponent(
       'Olá!\n\nQuero cadastrar minha empresa como fornecedora no LotePro.\n\nDados:\n- Empresa/Razão social:\n- CNPJ:\n- Nome do responsável:\n- Telefone:\n- Cidade/UF:\n\nObrigado!'
     );
-    await Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
+    await Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`).catch(() => {});
   }
 
   return (
@@ -40,6 +42,7 @@ export default function SupplierAccessScreen() {
         <View style={{ gap: spacing['2'], marginTop: spacing['2'] }}>
           <Button title="Abrir Portal do Fornecedor" onPress={openPortal} />
           <Button title="Solicitar cadastro" variant="secondary" onPress={requestAccess} />
+          <Button title="Voltar" variant="ghost" onPress={() => navigation.goBack()} />
         </View>
 
         <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}

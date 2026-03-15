@@ -12,6 +12,8 @@ type Props = {
   multiline?: boolean;
   error?: string | null;
   helperText?: string;
+  maxLength?: number;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
 };
 
 export default function Input({
@@ -24,6 +26,8 @@ export default function Input({
   multiline,
   error,
   helperText,
+  maxLength,
+  autoCapitalize,
 }: Props) {
   const borderColor = error ? resolveColor(theme.components.input.borderError) : resolveColor(theme.components.input.border);
 
@@ -38,6 +42,8 @@ export default function Input({
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         multiline={multiline}
+        maxLength={maxLength}
+        autoCapitalize={autoCapitalize}
         style={[
           styles.input,
           {

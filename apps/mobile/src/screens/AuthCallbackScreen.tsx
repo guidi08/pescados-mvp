@@ -65,7 +65,7 @@ export default function AuthCallbackScreen({ route, navigation }: Props) {
     return () => {
       mounted = false;
     };
-  }, [route.params?.code]);
+  }, [(route.params as any)?.code]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>

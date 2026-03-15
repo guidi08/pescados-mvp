@@ -8,6 +8,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
 import { colors, spacing, textStyle } from '../theme';
+import { centsToBRL } from '../utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Product'>;
 
@@ -22,11 +23,9 @@ type Product = {
   base_price_cents: number;
   unit: string;
   active: boolean;
-
   pricing_mode: 'per_unit' | 'per_kg_box';
   estimated_box_weight_kg: number | null;
   max_weight_variation_pct: number | null;
-
   sellers?: { display_name: string } | null;
 };
 
@@ -39,26 +38,28 @@ type Variant = {
   min_expiry_date: string | null;
 };
 
-function centsToBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
 export default function ProductScreen({ route, navigation }: Props) {
   const { productId } = route.params;
   const [product, setProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('1');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const { addItem } = useCart();
+  const { addItem, sellerId: currentCartSellerId, sellerName: currentCartSellerName, items: cartItems } = useCart();
 
   async function load() {
-    const { data: p } = await supabase
+    setLoadError(null);
+    const { data: p, error: pErr } = await supabase
       .from('products')
       .select('*, sellers(display_name)')
       .eq('id', productId)
       .single();
 
+    if (pErr) {
+      setLoadError(pErr.message);
+      return;
+    }
     setProduct(p as any);
 
     const { data: v } = await supabase
@@ -69,79 +70,80 @@ export default function ProductScreen({ route, navigation }: Props) {
 
     const activeVariants = ((v ?? []) as any as Variant[]).filter((x) => x.active);
     setVariants(activeVariants);
-
     if (activeVariants.length) setSelectedVariantId(activeVariants[0].id);
     else setSelectedVariantId(null);
   }
 
   useEffect(() => {
     load();
-
+    // Unique channel per product to avoid collisions
+    const channelName = `realtime-product-${productId}`;
     const channel = supabase
-      .channel('realtime-product')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `id=eq.${productId}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'product_variants', filter: `product_id=eq.${productId}` }, () => load())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [productId]);
 
-  const selectedVariant = useMemo(() => {
-    return variants.find((v) => v.id === selectedVariantId) ?? null;
-  }, [variants, selectedVariantId]);
-
+  const selectedVariant = useMemo(() => variants.find((v) => v.id === selectedVariantId) ?? null, [variants, selectedVariantId]);
   const unitPriceCents = selectedVariant ? selectedVariant.price_cents : (product?.base_price_cents ?? 0);
   const minExpiry = selectedVariant?.min_expiry_date ?? product?.min_expiry_date ?? null;
-
   const pricingMode = product?.pricing_mode ?? 'per_unit';
   const priceUnitLabel = pricingMode === 'per_kg_box' ? 'kg' : (product?.unit ?? 'un');
-
   const estimatedBoxWeightKg = product?.estimated_box_weight_kg ?? null;
   const maxVarPct = product?.max_weight_variation_pct ?? null;
 
   function parseQuantity(): number {
-    const q = Number(quantity.replace(',', '.'));
-    return q;
+    return Number(quantity.replace(',', '.'));
   }
 
   function onAddToCart() {
     if (!product) return;
-    if (!product.active) {
-      Alert.alert('Indisponível', 'Este produto está pausado.');
-      return;
-    }
+    if (!product.active) { Alert.alert('Indisponivel', 'Este produto esta pausado.'); return; }
 
     const q = parseQuantity();
-    if (!Number.isFinite(q) || q <= 0) {
-      Alert.alert('Quantidade inválida', 'Informe uma quantidade válida.');
-      return;
-    }
-
-    if (pricingMode === 'per_kg_box' && !Number.isInteger(q)) {
-      Alert.alert('Quantidade inválida', 'Para produtos por caixa, a quantidade deve ser um número inteiro (ex.: 1, 2, 3...).');
-      return;
-    }
+    if (!Number.isFinite(q) || q <= 0) { Alert.alert('Quantidade invalida', 'Informe uma quantidade valida maior que zero.'); return; }
+    if (pricingMode === 'per_kg_box' && !Number.isInteger(q)) { Alert.alert('Quantidade invalida', 'Para produtos por caixa, a quantidade deve ser um numero inteiro.'); return; }
 
     const sellerName = (product as any).sellers?.display_name ?? 'Fornecedor';
-
-    addItem(product.seller_id, sellerName, {
+    const item = {
       productId: product.id,
       variantId: selectedVariant?.id ?? null,
       productName: product.name,
       variantName: selectedVariant?.name ?? null,
-
       unit: product.unit,
       pricingMode,
       unitPriceCents,
       quantity: q,
-
       estimatedBoxWeightKg: pricingMode === 'per_kg_box' ? estimatedBoxWeightKg : null,
       maxWeightVariationPct: pricingMode === 'per_kg_box' ? maxVarPct : null,
-    });
+    };
 
+    // Confirm seller change
+    if (currentCartSellerId && currentCartSellerId !== product.seller_id && cartItems.length > 0) {
+      Alert.alert(
+        'Trocar fornecedor?',
+        `Seu carrinho tem itens de "${currentCartSellerName}". Ao adicionar este item, o carrinho anterior sera substituido.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Trocar e adicionar', onPress: () => { addItem(product.seller_id, sellerName, item); Alert.alert('Adicionado', 'Item adicionado ao carrinho.'); } },
+        ]
+      );
+      return;
+    }
+
+    addItem(product.seller_id, sellerName, item);
     Alert.alert('Adicionado', 'Item adicionado ao carrinho.');
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={{ flex: 1, padding: spacing['4'], backgroundColor: colors.background.app }}>
+        <Text style={[textStyle('body'), { color: colors.semantic.error }]}>Erro ao carregar: {loadError}</Text>
+        <Button title="Tentar novamente" onPress={load} variant="secondary" />
+      </SafeAreaView>
+    );
   }
 
   if (!product) {
@@ -153,10 +155,9 @@ export default function ProductScreen({ route, navigation }: Props) {
   }
 
   const qPreview = parseQuantity();
-  const estimatedTotalCents =
-    pricingMode === 'per_unit'
-      ? Math.round(unitPriceCents * (Number.isFinite(qPreview) ? qPreview : 0))
-      : Math.round(unitPriceCents * (Number(estimatedBoxWeightKg ?? 0) * (Number.isFinite(qPreview) ? qPreview : 0)));
+  const estimatedTotalCents = pricingMode === 'per_unit'
+    ? Math.round(unitPriceCents * (Number.isFinite(qPreview) ? qPreview : 0))
+    : Math.round(unitPriceCents * (Number(estimatedBoxWeightKg ?? 0) * (Number.isFinite(qPreview) ? qPreview : 0)));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
@@ -168,28 +169,19 @@ export default function ProductScreen({ route, navigation }: Props) {
 
         <View style={{ flexDirection: 'row', gap: spacing['2'], flexWrap: 'wrap' }}>
           <Badge label={product.fresh ? 'Fresco' : 'Congelado'} variant={product.fresh ? 'fresh' : 'frozen'} />
-          {pricingMode === 'per_kg_box' ? <Badge label="Peso variável" variant="variable" /> : null}
-          {product.tags?.length ? <Badge label={product.tags.join(' • ')} variant="variable" /> : null}
+          {pricingMode === 'per_kg_box' ? <Badge label="Peso variavel" variant="variable" /> : null}
+          {product.tags?.length ? <Badge label={product.tags.join(' - ')} variant="variable" /> : null}
         </View>
 
-        {minExpiry ? (
-          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Validade mínima: {minExpiry}</Text>
-        ) : null}
-
+        {minExpiry ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Validade minima: {minExpiry}</Text> : null}
         {product.description ? <Text style={[textStyle('body'), { color: colors.text.primary }]}>{product.description}</Text> : null}
 
         {pricingMode === 'per_kg_box' ? (
           <Card>
-            <Text style={textStyle('h3')}>Produto por caixa (peso variável)</Text>
-            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>
-              Preço é por kg. Você compra por caixa.
-            </Text>
-            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>
-              Peso estimado: {estimatedBoxWeightKg ?? '—'} kg/caixa{maxVarPct ? ` • variação máx.: ${maxVarPct}%` : ''}
-            </Text>
-            <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}>
-              O valor final pode variar. Em B2B, o ajuste pode gerar crédito/débito no saldo do cliente.
-            </Text>
+            <Text style={textStyle('h3')}>Produto por caixa (peso variavel)</Text>
+            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>Preco e por kg. Voce compra por caixa.</Text>
+            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>Peso estimado: {estimatedBoxWeightKg ?? '—'} kg/caixa{maxVarPct ? ` - variacao max.: ${maxVarPct}%` : ''}</Text>
+            <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}>O valor final pode variar. Em B2B, o ajuste pode gerar credito/debito no saldo do cliente.</Text>
           </Card>
         ) : null}
 
@@ -198,12 +190,7 @@ export default function ProductScreen({ route, navigation }: Props) {
             <Text style={textStyle('label')}>Escolha o calibre/tamanho</Text>
             <View style={{ gap: spacing['2'] }}>
               {variants.map((v) => (
-                <Button
-                  key={v.id}
-                  title={`${selectedVariantId === v.id ? '✓ ' : ''}${v.name} — ${centsToBRL(v.price_cents)}/${priceUnitLabel}`}
-                  onPress={() => setSelectedVariantId(v.id)}
-                  variant={selectedVariantId === v.id ? 'primary' : 'secondary'}
-                />
+                <Button key={v.id} title={`${selectedVariantId === v.id ? '✓ ' : ''}${v.name} — ${centsToBRL(v.price_cents)}/${priceUnitLabel}`} onPress={() => setSelectedVariantId(v.id)} variant={selectedVariantId === v.id ? 'primary' : 'secondary'} />
               ))}
             </View>
           </View>
@@ -212,21 +199,9 @@ export default function ProductScreen({ route, navigation }: Props) {
         )}
 
         <View style={{ gap: spacing['2'] }}>
-          <Text style={textStyle('label')}>
-            Quantidade ({pricingMode === 'per_kg_box' ? 'caixas' : product.unit})
-          </Text>
-          <TextInput
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType={pricingMode === 'per_kg_box' ? 'number-pad' : 'decimal-pad'}
-            placeholder="1"
-            placeholderTextColor={colors.text.tertiary}
-            style={{ borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-          <Text style={[textStyle('small'), { color: colors.text.secondary }]}
-          >
-            Total estimado: {centsToBRL(Number.isFinite(estimatedTotalCents) ? estimatedTotalCents : 0)}
-          </Text>
+          <Text style={textStyle('label')}>Quantidade ({pricingMode === 'per_kg_box' ? 'caixas' : product.unit})</Text>
+          <TextInput value={quantity} onChangeText={setQuantity} keyboardType={pricingMode === 'per_kg_box' ? 'number-pad' : 'decimal-pad'} placeholder="1" placeholderTextColor={colors.text.tertiary} style={{ borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }} />
+          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Total estimado: {centsToBRL(Number.isFinite(estimatedTotalCents) ? estimatedTotalCents : 0)}</Text>
         </View>
 
         <View style={{ gap: spacing['2'] }}>

@@ -33,9 +33,8 @@ type OrderRow = {
   order_items?: OrderItem[];
 };
 
-function centsToBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+import { Alert } from 'react-native';
+import { centsToBRL } from '../utils';
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('pt-BR', {
@@ -124,10 +123,9 @@ export default function OrdersScreen() {
   function reorder(o: OrderRow) {
     const sellerName = o.sellers?.display_name ?? 'Fornecedor';
 
-    // iFood-style: 1 seller per cart → limpar e adicionar
-    clear();
-
-    for (const it of o.order_items ?? []) {
+    const doReorder = () => {
+      clear();
+      for (const it of o.order_items ?? []) {
       // Recover an estimated "box weight" from total snapshot when pricing_mode is per_kg_box
       const estimatedBoxWeightKg =
         it.pricing_mode_snapshot === 'per_kg_box' && it.estimated_total_weight_kg_snapshot && it.quantity
@@ -148,7 +146,18 @@ export default function OrdersScreen() {
       });
     }
 
-    navigation.navigate('Cart');
+      navigation.navigate('Cart');
+    };
+
+    // Warn about potentially stale prices
+    Alert.alert(
+      'Repetir pedido',
+      'Os precos usados serao os do pedido original e podem estar desatualizados. Confira no carrinho antes de finalizar.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Adicionar a sacola', onPress: doReorder },
+      ]
+    );
   }
 
   return (

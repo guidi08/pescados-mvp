@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, SafeAreaView, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import * as Linking from 'expo-linking';
 
 import { supabase } from '../supabaseClient';
 import { useBuyer } from '../context/BuyerContext';
@@ -10,9 +9,10 @@ import Card from '../components/Card';
 import { colors, spacing, textStyle } from '../theme';
 
 const SUPPORT_EMAIL = 'suporte@guestengine.io';
-const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL || 'https://lotepro.com.br/termos';
-const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL || 'https://lotepro.com.br/privacidade';
-const REFUND_URL = process.env.EXPO_PUBLIC_REFUND_URL || 'https://lotepro.com.br/cancelamento';
+const PORTAL_URL = process.env.EXPO_PUBLIC_SUPPLIER_PORTAL_URL ?? '';
+const TERMS_URL = PORTAL_URL ? `${PORTAL_URL}/termos` : '';
+const PRIVACY_URL = PORTAL_URL ? `${PORTAL_URL}/privacidade` : '';
+const CANCEL_URL = PORTAL_URL ? `${PORTAL_URL}/cancelamento` : '';
 
 function MenuItem({
   icon,
@@ -53,22 +53,32 @@ export default function ProfileScreen() {
   const { channel } = useBuyer();
 
   const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
+  async function loadProfile() {
+    try {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;
       if (!user) return;
-
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (mounted) setProfile(p);
+      const { data: p, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (error) console.warn('[profile] Load error:', error.message);
+      setProfile(p);
+    } catch (e) {
+      console.warn('[profile] Load failed:', e);
+    } finally {
+      setLoading(false);
     }
-    load();
-    return () => {
-      mounted = false;
-    };
+  }
+
+  useEffect(() => {
+    loadProfile();
   }, []);
+
+  // Refetch profile when screen gains focus (after editing in Account/Address)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => { loadProfile(); });
+    return unsub;
+  }, [navigation]);
 
   const displayName = useMemo(() => {
     if (profile?.full_name) return profile.full_name;
@@ -80,6 +90,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
+      <ScrollView>
       <View style={{ padding: spacing['4'], paddingBottom: spacing['3'] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing['3'] }}>
           <View
@@ -108,7 +119,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <View style={{ paddingHorizontal: spacing['4'], gap: spacing['3'] }}>
+      <View style={{ paddingHorizontal: spacing['4'], gap: spacing['3'], paddingBottom: spacing['6'] }}>
         <Card style={{ paddingVertical: 6 }}>
           <MenuItem
             icon="receipt-outline"
@@ -120,18 +131,9 @@ export default function ProfileScreen() {
           <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
 
           <MenuItem
-            icon="card-outline"
-            title="Pagamentos"
-            subtitle="Gerenciar meios de pagamento"
-            onPress={() => Alert.alert('Pagamentos', 'Em breve. No MVP o pagamento é feito no checkout (Pix ou Cartão).')}
-          />
-
-          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
-
-          <MenuItem
             icon="person-circle-outline"
             title="Dados da conta"
-            subtitle="Telefone, CPF/CNPJ e informações"
+            subtitle="Telefone e informações pessoais"
             onPress={() => navigation.navigate('Account')}
           />
 
@@ -140,7 +142,7 @@ export default function ProfileScreen() {
           <MenuItem
             icon="location-outline"
             title="Endereço de entrega"
-            subtitle="Obrigatório para B2C"
+            subtitle="Cadastre ou edite seu endereço"
             onPress={() => navigation.navigate('Address')}
           />
 
@@ -155,49 +157,44 @@ export default function ProfileScreen() {
               />
             </>
           ) : null}
+        </Card>
 
-          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
-
+        <Card style={{ paddingVertical: 6 }}>
+          {TERMS_URL ? (
+            <>
+              <MenuItem
+                icon="document-text-outline"
+                title="Termos de Uso"
+                onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
+              />
+              <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+            </>
+          ) : null}
+          {PRIVACY_URL ? (
+            <>
+              <MenuItem
+                icon="shield-checkmark-outline"
+                title="Política de Privacidade"
+                onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
+              />
+              <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+            </>
+          ) : null}
+          {CANCEL_URL ? (
+            <>
+              <MenuItem
+                icon="return-down-back-outline"
+                title="Cancelamento e Reembolso"
+                onPress={() => Linking.openURL(CANCEL_URL).catch(() => {})}
+              />
+              <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+            </>
+          ) : null}
           <MenuItem
             icon="help-circle-outline"
             title="Suporte"
             subtitle={SUPPORT_EMAIL}
-            onPress={() => {
-              Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
-            }}
-          />
-
-          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
-
-          <MenuItem
-            icon="document-text-outline"
-            title="Termos de Uso"
-            onPress={() => Linking.openURL(TERMS_URL)}
-          />
-
-          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
-
-          <MenuItem
-            icon="shield-checkmark-outline"
-            title="Política de Privacidade"
-            onPress={() => Linking.openURL(PRIVACY_URL)}
-          />
-
-          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
-
-          <MenuItem
-            icon="refresh-outline"
-            title="Cancelamento/Reembolso"
-            onPress={() => Linking.openURL(REFUND_URL)}
-          />
-
-          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
-
-          <MenuItem
-            icon="trash-outline"
-            title="Excluir conta"
-            subtitle="Solicitar exclusão"
-            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Excluir%20conta%20LotePro`)}
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {})}
           />
         </Card>
 
@@ -206,8 +203,30 @@ export default function ProfileScreen() {
             icon="log-out-outline"
             title="Sair"
             onPress={async () => {
-              await supabase.auth.signOut();
+              try {
+                await supabase.auth.signOut();
+              } catch (e) {
+                console.warn('[profile] Sign out error:', e);
+              }
               navigation.reset({ index: 0, routes: [{ name: 'Entry' }] as any });
+            }}
+          />
+
+          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginLeft: 38 }} />
+
+          <MenuItem
+            icon="trash-outline"
+            title="Excluir conta"
+            subtitle="Solicitar exclusão dos seus dados"
+            onPress={() => {
+              Alert.alert(
+                'Excluir conta',
+                `Para solicitar a exclusão da sua conta e dados, envie um e-mail para ${SUPPORT_EMAIL} com o assunto "Exclusão de conta".`,
+                [
+                  { text: 'Enviar e-mail', onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Exclus%C3%A3o%20de%20conta`).catch(() => {}) },
+                  { text: 'Cancelar', style: 'cancel' },
+                ]
+              );
             }}
           />
         </Card>
@@ -217,6 +236,7 @@ export default function ProfileScreen() {
           LotePro • Marketplace de proteínas
         </Text>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

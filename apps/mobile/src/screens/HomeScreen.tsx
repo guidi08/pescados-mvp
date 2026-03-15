@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  DimensionValue,
   Dimensions,
   FlatList,
   Image,
@@ -31,11 +32,17 @@ type Seller = {
   logo_url?: string | null;
 };
 
-function centsToBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+import { centsToBRL } from '../utils';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Dynamic width — updates on rotation/split-screen
+function useScreenWidth() {
+  const [w, setW] = useState(Dimensions.get('window').width);
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window }) => setW(window.width));
+    return () => sub.remove();
+  }, []);
+  return w;
+}
 
 const CATEGORY_TILES: Array<{
   key: string;
@@ -98,7 +105,7 @@ const CATEGORY_TILES: Array<{
   },
 ];
 
-function Skeleton({ w, h, r = 12 }: { w: number | string; h: number; r?: number }) {
+function Skeleton({ w, h, r = 12 }: { w: DimensionValue; h: number; r?: number }) {
   return (
     <View
       style={{
@@ -232,9 +239,11 @@ function SellerRow({ s, onPress }: { s: Seller; onPress: () => void }) {
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { channel } = useBuyer();
+  const SCREEN_WIDTH = useScreenWidth();
 
   const [loading, setLoading] = useState(true);
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Micro-entrance animation for the header (leve e suave)
   const enter = useRef(new Animated.Value(0)).current;
@@ -253,7 +262,10 @@ export default function HomeScreen() {
       .eq('active', true)
       .order('display_name', { ascending: true });
 
-    if (!error) {
+    if (error) {
+      setLoadError(error.message);
+    } else {
+      setLoadError(null);
       const list = (data ?? []) as any as Seller[];
       const filtered = list.filter((s) => {
         if (!s.active) return false;

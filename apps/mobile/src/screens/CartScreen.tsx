@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -27,9 +28,7 @@ type ProductSuggestion = {
   max_weight_variation_pct: number | null;
 };
 
-function centsToBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+import { centsToBRL } from '../utils';
 
 function lineTotalCents(it: CartItem): number {
   if (it.pricingMode === 'per_unit') {
@@ -264,7 +263,13 @@ export default function CartScreen() {
         <Text style={[textStyle('h3'), { letterSpacing: 1 }]}>SACOLA</Text>
 
         <Pressable
-          onPress={clear}
+          onPress={() => {
+            if (!items.length) return;
+            Alert.alert('Limpar sacola?', 'Todos os itens serao removidos.', [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Limpar', style: 'destructive', onPress: clear },
+            ]);
+          }}
           hitSlop={10}
           style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >

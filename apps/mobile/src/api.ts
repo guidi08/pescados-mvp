@@ -1,9 +1,21 @@
 import { supabase } from './supabaseClient';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL!;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
+if (!API_BASE_URL) {
+  console.warn('[api] Missing EXPO_PUBLIC_API_BASE_URL — API calls will fail.');
+}
+
+/**
+ * Authenticated API request with automatic token refresh and 401 handling.
+ */
 export async function apiRequest<T>(path: string, options: { method?: string; body?: any } = {}): Promise<T> {
-  const { data: sessionData } = await supabase.auth.getSession();
+  if (!API_BASE_URL) throw new Error('API não configurada (EXPO_PUBLIC_API_BASE_URL ausente).');
+
+  // Use getSession which auto-refreshes if token is expired (requires AsyncStorage)
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw new Error(`Sessão expirada: ${sessionError.message}`);
+
   const token = sessionData.session?.access_token;
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -16,33 +28,59 @@ export async function apiRequest<T>(path: string, options: { method?: string; bo
   });
 
   if (!res.ok) {
-    const contentType = res.headers.get('content-type') ?? '';
-    if (contentType.includes('application/json')) {
-      const err = await res.json().catch(() => null);
-
-      // Friendly messages for common API errors
-      if (err?.error === 'wallet_negative_balance') {
-        throw new Error(`Seu saldo está negativo (${err.balance}). Quite o saldo para continuar.`);
+    // Handle 401 — token expired or revoked
+    if (res.status === 401) {
+      // Try refreshing the session once
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        throw new Error('Sessão expirada. Faça login novamente.');
       }
-      if (err?.error === 'seller_not_enabled_for_b2c') {
-        throw new Error('Este fornecedor não está habilitado para B2C (CPF).');
-      }
-      if (err?.error === 'below_min_order') {
-        throw new Error('Pedido abaixo do mínimo do fornecedor.');
-      }
-      if (err?.error === 'missing_delivery_address') {
-        throw new Error('Informe o endereço de entrega.');
-      }
-      if (err?.error) {
-        throw new Error(String(err.error));
-      }
+      // Retry the request with the new token
+      const { data: newSession } = await supabase.auth.getSession();
+      const newToken = newSession.session?.access_token;
+      const retryRes = await fetch(`${API_BASE_URL}${path}`, {
+        method: options.method ?? 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      });
+      if (retryRes.ok) return retryRes.json() as Promise<T>;
+      // If retry also fails, fall through to error handling with retryRes
+      return handleErrorResponse(retryRes);
     }
 
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `HTTP ${res.status}`);
+    return handleErrorResponse(res);
   }
 
   return res.json() as Promise<T>;
+}
+
+async function handleErrorResponse(res: Response): Promise<never> {
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    const err = await res.json().catch(() => null);
+
+    if (err?.error === 'wallet_negative_balance') {
+      throw new Error(`Seu saldo est\u00e1 negativo (${err.balance}). Quite o saldo para continuar.`);
+    }
+    if (err?.error === 'seller_not_enabled_for_b2c') {
+      throw new Error('Este fornecedor n\u00e3o est\u00e1 habilitado para B2C (CPF).');
+    }
+    if (err?.error === 'below_min_order') {
+      throw new Error('Pedido abaixo do m\u00ednimo do fornecedor.');
+    }
+    if (err?.error === 'missing_delivery_address') {
+      throw new Error('Informe o endere\u00e7o de entrega.');
+    }
+    if (err?.error) {
+      throw new Error(String(err.error));
+    }
+  }
+
+  // Don't try res.text() if we already consumed the body with res.json()
+  throw new Error(`Erro HTTP ${res.status}`);
 }
 
 // ---- Convenience wrappers (MVP) ----

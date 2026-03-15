@@ -17,7 +17,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "io.guestengine.lotepro"
+      "bundleIdentifier": "io.guestengine.lotepro",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,6 +34,9 @@
         "projectId": "354c3106-0dee-43ce-91c2-38f2eba3996d"
       }
     },
-    "owner": "guidi08"
+    "owner": "guidi08",
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

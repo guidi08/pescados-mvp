@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, SafeAreaView, Text, TextInput, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../supabaseClient';
@@ -7,6 +7,7 @@ import { useBuyer } from '../context/BuyerContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { colors, spacing, textStyle } from '../theme';
+import { formatCPF, formatCNPJ, formatPhone, isValidCPF, isValidCNPJ } from '../utils';
 
 type DocType = 'cpf' | 'cnpj';
 
@@ -40,7 +41,44 @@ export default function AccountScreen() {
     }
   }, [profile?.id]);
 
+  function handleDocTypeSwitch(next: DocType) {
+    if (next === docType) return;
+    setDocType(next);
+    setDocNumber(''); // Clear doc number when switching types
+    if (next === 'cpf') setCompanyName('');
+  }
+
+  function handleDocNumberChange(value: string) {
+    if (docType === 'cpf') {
+      setDocNumber(formatCPF(value));
+    } else {
+      setDocNumber(formatCNPJ(value));
+    }
+  }
+
+  function handlePhoneChange(value: string) {
+    setPhone(formatPhone(value));
+  }
+
   async function save() {
+    // Basic validation
+    if (!fullName.trim()) {
+      Alert.alert('Campo obrigatório', 'Preencha o nome.');
+      return;
+    }
+
+    const rawDoc = docNumber.replace(/\D/g, '');
+    if (rawDoc) {
+      if (docType === 'cpf' && !isValidCPF(rawDoc)) {
+        Alert.alert('CPF inválido', 'Verifique o CPF digitado.');
+        return;
+      }
+      if (docType === 'cnpj' && !isValidCNPJ(rawDoc)) {
+        Alert.alert('CNPJ inválido', 'Verifique o CNPJ digitado.');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -48,11 +86,11 @@ export default function AccountScreen() {
       if (!userId) throw new Error('Sessão não encontrada.');
 
       const patch: any = {
-        full_name: fullName || null,
-        phone: phone || null,
+        full_name: fullName.trim() || null,
+        phone: phone.replace(/\D/g, '') || null,
         company_name: docType === 'cnpj' ? (companyName || fullName || null) : null,
-        cpf: docType === 'cpf' ? (docNumber || null) : null,
-        cnpj: docType === 'cnpj' ? (docNumber || null) : null,
+        cpf: docType === 'cpf' ? (rawDoc || null) : null,
+        cnpj: docType === 'cnpj' ? (rawDoc || null) : null,
       };
 
       // Clear the other doc field
@@ -74,7 +112,7 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
-      <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
+      <ScrollView contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }} keyboardShouldPersistTaps="handled">
         <Text style={textStyle('h1')}>Dados da conta</Text>
 
         <Card>
@@ -98,7 +136,7 @@ export default function AccountScreen() {
           <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>Telefone</Text>
           <TextInput
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={handlePhoneChange}
             placeholder="(11) 99999-9999"
             placeholderTextColor={colors.text.tertiary}
             keyboardType="phone-pad"
@@ -121,13 +159,13 @@ export default function AccountScreen() {
               title="CPF"
               size="sm"
               variant={docType === 'cpf' ? 'primary' : 'secondary'}
-              onPress={() => setDocType('cpf')}
+              onPress={() => handleDocTypeSwitch('cpf')}
             />
             <Button
               title="CNPJ"
               size="sm"
               variant={docType === 'cnpj' ? 'primary' : 'secondary'}
-              onPress={() => setDocType('cnpj')}
+              onPress={() => handleDocTypeSwitch('cnpj')}
             />
           </View>
 
@@ -155,7 +193,7 @@ export default function AccountScreen() {
           <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>{docType.toUpperCase()}</Text>
           <TextInput
             value={docNumber}
-            onChangeText={setDocNumber}
+            onChangeText={handleDocNumberChange}
             placeholder={docType === 'cpf' ? '000.000.000-00' : '00.000.000/0001-00'}
             placeholderTextColor={colors.text.tertiary}
             keyboardType="number-pad"
@@ -180,7 +218,7 @@ export default function AccountScreen() {
           <Button title={saving ? 'Salvando…' : 'Salvar'} onPress={save} disabled={saving} />
           <Button title="Voltar" variant="secondary" onPress={() => navigation.goBack()} />
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

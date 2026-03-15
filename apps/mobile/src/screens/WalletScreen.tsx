@@ -1,27 +1,35 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, RefreshControl, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { colors, spacing, textStyle } from '../theme';
 import { createWalletTopupPaymentSheet, createWalletTopupPix, getWalletMe } from '../api';
-
-function centsToBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+import { centsToBRL } from '../utils';
 
 export default function WalletScreen({ navigation }: any) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [balanceCents, setBalanceCents] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const loadingRef = useRef(false);
 
   const isNegative = balanceCents < 0;
   const amountDueCents = useMemo(() => (isNegative ? Math.abs(balanceCents) : 0), [balanceCents, isNegative]);
 
-  async function load() {
-    setLoading(true);
+  async function load(isRefresh = false) {
+    // Guard against concurrent loads
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const data = await getWalletMe();
       setBalanceCents(Number(data.balanceCents ?? 0));
@@ -30,6 +38,8 @@ export default function WalletScreen({ navigation }: any) {
       Alert.alert('Erro', e?.message ?? 'Não foi possível carregar o saldo.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      loadingRef.current = false;
     }
   }
 
@@ -84,7 +94,16 @@ export default function WalletScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
-      <ScrollView contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}>
+      <ScrollView
+        contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => load(true)}
+            tintColor={colors.brand.primary}
+          />
+        }
+      >
         <Text style={textStyle('h1')}>Saldo</Text>
 
         <Card>
@@ -135,7 +154,6 @@ export default function WalletScreen({ navigation }: any) {
         </Card>
 
         <View style={{ gap: spacing['2'] }}>
-          <Button title="Atualizar" onPress={load} variant="secondary" />
           <Button title="Voltar" onPress={() => navigation.goBack()} variant="ghost" />
         </View>
       </ScrollView>

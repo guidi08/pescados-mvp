@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { LayoutAnimation } from 'react-native';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from '../supabaseClient';
 
@@ -46,6 +47,8 @@ type CartContextValue = CartState & {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
+const CART_STORAGE_KEY = '@lotepro/cart';
+
 function lineTotalCents(it: CartItem): number {
   if (it.pricingMode === 'per_unit') {
     return Math.round(it.unitPriceCents * it.quantity);
@@ -57,6 +60,33 @@ function lineTotalCents(it: CartItem): number {
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<CartState>({ sellerId: null, sellerName: null, items: [] });
   const [shippingFeeCents, setShippingFeeCents] = useState(0);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Persist cart to AsyncStorage
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+    }, 500);
+  }, [state, hydrated]);
+
+  // Hydrate cart from AsyncStorage on mount
+  useEffect(() => {
+    AsyncStorage.getItem(CART_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.items)) {
+              setState(parsed);
+            }
+          } catch {}
+        }
+      })
+      .finally(() => setHydrated(true));
+  }, []);
 
   const subtotalCents = useMemo(() => {
     return state.items.reduce((acc, it) => acc + lineTotalCents(it), 0);
@@ -70,11 +100,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('sellers')
         .select('shipping_fee_cents')
         .eq('id', state.sellerId)
         .single();
+
+      if (error) {
+        console.warn('[cart] Failed to load shipping fee:', error.message);
+      }
 
       if (!mounted) return;
       setShippingFeeCents(Number((data as any)?.shipping_fee_cents ?? 0));
@@ -88,30 +122,35 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const totalCents = subtotalCents + shippingFeeCents;
 
   function animateNext() {
-    // Lightweight micro-transition (cart add/remove/qty)
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   }
 
-  function addItem(sellerId: string, sellerName: string, item: CartItem) {
+  const addItem = useCallback((sellerId: string, sellerName: string, item: CartItem) => {
     animateNext();
     setState((prev) => {
-      // Enforce 1 seller per cart (estilo iFood)
+      // Enforce 1 seller per cart (estilo iFood) — confirm with user
       if (prev.sellerId && prev.sellerId !== sellerId) {
+        // The confirmation is handled by the caller (ProductScreen)
         return { sellerId, sellerName, items: [item] };
       }
 
       const idx = prev.items.findIndex((i) => i.productId === item.productId && (i.variantId ?? null) === (item.variantId ?? null));
       if (idx >= 0) {
         const items = [...prev.items];
-        items[idx] = { ...items[idx], quantity: items[idx].quantity + item.quantity };
+        // Update price to latest + add quantity
+        items[idx] = {
+          ...items[idx],
+          quantity: items[idx].quantity + item.quantity,
+          unitPriceCents: item.unitPriceCents, // Always update to latest price
+        };
         return { sellerId, sellerName, items };
       }
 
       return { sellerId, sellerName, items: [...prev.items, item] };
     });
-  }
+  }, []);
 
-  function updateQuantity(productId: string, variantId: string | null | undefined, quantity: number) {
+  const updateQuantity = useCallback((productId: string, variantId: string | null | undefined, quantity: number) => {
     animateNext();
     setState((prev) => {
       const items = prev.items
@@ -125,19 +164,35 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       return { ...prev, items, ...(items.length ? {} : { sellerId: null, sellerName: null }) };
     });
-  }
+  }, []);
 
-  function removeItem(productId: string, variantId: string | null | undefined) {
+  const removeItem = useCallback((productId: string, variantId: string | null | undefined) => {
     updateQuantity(productId, variantId, 0);
-  }
+  }, [updateQuantity]);
 
-  function clear() {
+  const clear = useCallback(() => {
     animateNext();
     setState({ sellerId: null, sellerName: null, items: [] });
-  }
+    AsyncStorage.removeItem(CART_STORAGE_KEY).catch(() => {});
+  }, []);
+
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo<CartContextValue>(
+    () => ({
+      ...state,
+      addItem,
+      updateQuantity,
+      removeItem,
+      clear,
+      totalCents,
+      subtotalCents,
+      shippingFeeCents,
+    }),
+    [state, addItem, updateQuantity, removeItem, clear, totalCents, subtotalCents, shippingFeeCents]
+  );
 
   return (
-    <CartContext.Provider value={{ ...state, addItem, updateQuantity, removeItem, clear, totalCents, subtotalCents, shippingFeeCents }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

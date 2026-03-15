@@ -37,9 +37,7 @@ type Seller = {
   b2c_enabled: boolean;
 };
 
-function centsToBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+import { centsToBRL } from '../utils';
 
 function ProductRow({ p, sellerName, onPress }: { p: Product; sellerName?: string; onPress: () => void }) {
   return (
@@ -219,7 +217,7 @@ export default function ProductsScreen() {
         >
           <Ionicons name="search" size={18} color={colors.text.tertiary} />
           <TextInput
-            ref={(r) => (inputRef.current = r)}
+            ref={(r) => { inputRef.current = r; }}
             value={query}
             onChangeText={setQuery}
             placeholder="O que vai pedir hoje?"

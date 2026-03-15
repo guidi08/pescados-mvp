@@ -1,155 +1,159 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, SafeAreaView, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-
+import { Alert, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { supabase } from '../supabaseClient';
-import { useBuyer } from '../context/BuyerContext';
 import Button from '../components/Button';
-import Card from '../components/Card';
+import Input from '../components/Input';
 import { colors, spacing, textStyle } from '../theme';
+import { formatCEP } from '../utils';
 
-export default function AddressScreen() {
-  const navigation = useNavigation<any>();
-  const { profile, refresh } = useBuyer();
+type AddressFields = {
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  reference: string;
+};
 
-  const [street, setStreet] = useState('');
-  const [number, setNumber] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [complement, setComplement] = useState('');
-  const [reference, setReference] = useState('');
+const EMPTY: AddressFields = {
+  street: '',
+  number: '',
+  complement: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+  postal_code: '',
+  reference: '',
+};
+
+export default function AddressScreen({ navigation }: any) {
+  const [address, setAddress] = useState<AddressFields>(EMPTY);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const addr = (profile as any)?.address ?? {};
-    setStreet(addr.street ?? '');
-    setNumber(addr.number ?? '');
-    setNeighborhood(addr.neighborhood ?? '');
-    setCity(addr.city ?? '');
-    setState(addr.state ?? '');
-    setPostalCode(addr.postal_code ?? '');
-    setComplement(addr.complement ?? '');
-    setReference(addr.reference ?? '');
-  }, [profile?.id]);
+    let mounted = true;
+    async function load() {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData.session?.user?.id;
+        if (!userId) {
+          // No session — stop loading to avoid infinite spinner
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('address')
+          .eq('id', userId)
+          .single();
+
+        if (error) console.warn('[address] Load error:', error.message);
+
+        if (mounted && data?.address) {
+          setAddress({ ...EMPTY, ...(data.address as any) });
+        }
+      } catch (e) {
+        console.warn('[address] Load failed:', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => { mounted = false; };
+  }, []);
+
+  function update(field: keyof AddressFields, value: string) {
+    if (field === 'postal_code') {
+      setAddress((prev) => ({ ...prev, [field]: formatCEP(value) }));
+    } else {
+      setAddress((prev) => ({ ...prev, [field]: value }));
+    }
+  }
 
   async function save() {
+    if (!address.street || !address.number || !address.neighborhood || !address.city || !address.state || !address.postal_code) {
+      Alert.alert('Campos obrigatórios', 'Preencha rua, número, bairro, cidade, estado e CEP.');
+      return;
+    }
+
     setSaving(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user.id;
-      if (!userId) throw new Error('Sessão não encontrada.');
+      const userId = sessionData.session?.user?.id;
+      if (!userId) throw new Error('Usuário não autenticado');
 
-      const address = {
-        street: street || null,
-        number: number || null,
-        neighborhood: neighborhood || null,
-        city: city || null,
-        state: state || null,
-        postal_code: postalCode || null,
-        complement: complement || null,
-        reference: reference || null,
+      // Store raw digits for postal_code
+      const addressToSave = {
+        ...address,
+        postal_code: address.postal_code.replace(/\D/g, ''),
       };
 
-      const { error } = await supabase.from('profiles').update({ address }).eq('id', userId);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ address: addressToSave })
+        .eq('id', userId);
+
       if (error) throw error;
 
-      await refresh();
-      Alert.alert('Salvo', 'Endereço atualizado.');
+      Alert.alert('Endereço salvo', 'Seu endereço de entrega foi atualizado.');
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Falha ao salvar.');
+      Alert.alert('Erro', e?.message ?? 'Falha ao salvar endereço');
     } finally {
       setSaving(false);
     }
   }
 
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background.app }}>
+        <Text style={textStyle('body')}>Carregando...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
-      <View style={{ padding: spacing['4'], gap: spacing['3'] }}>
-        <Text style={textStyle('h1')}>Endereço de entrega</Text>
+      <ScrollView contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }} keyboardShouldPersistTaps="handled">
+        <Text style={[textStyle('body'), { color: colors.text.secondary, marginBottom: spacing['2'] }]}>
+          Informe o endereço para entrega dos seus pedidos.
+        </Text>
 
-        <Card>
-          <Text style={textStyle('label')}>Rua</Text>
-          <TextInput
-            value={street}
-            onChangeText={setStreet}
-            placeholder="Rua"
-            placeholderTextColor={colors.text.tertiary}
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
+        <Input label="Rua / Avenida *" value={address.street} onChangeText={(v) => update('street', v)} placeholder="Ex: Rua das Flores" />
 
-          <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>Número</Text>
-          <TextInput
-            value={number}
-            onChangeText={setNumber}
-            placeholder="Número"
-            placeholderTextColor={colors.text.tertiary}
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-
-          <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>Bairro</Text>
-          <TextInput
-            value={neighborhood}
-            onChangeText={setNeighborhood}
-            placeholder="Bairro"
-            placeholderTextColor={colors.text.tertiary}
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-
-          <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>Cidade</Text>
-          <TextInput
-            value={city}
-            onChangeText={setCity}
-            placeholder="Cidade"
-            placeholderTextColor={colors.text.tertiary}
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-
-          <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>Estado</Text>
-          <TextInput
-            value={state}
-            onChangeText={setState}
-            placeholder="UF"
-            placeholderTextColor={colors.text.tertiary}
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-
-          <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>CEP</Text>
-          <TextInput
-            value={postalCode}
-            onChangeText={setPostalCode}
-            placeholder="00000-000"
-            placeholderTextColor={colors.text.tertiary}
-            keyboardType="number-pad"
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-
-          <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>Complemento</Text>
-          <TextInput
-            value={complement}
-            onChangeText={setComplement}
-            placeholder="Apto, bloco, etc."
-            placeholderTextColor={colors.text.tertiary}
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-
-          <Text style={[textStyle('label'), { marginTop: spacing['3'] }]}>Referência</Text>
-          <TextInput
-            value={reference}
-            onChangeText={setReference}
-            placeholder="Ponto de referência"
-            placeholderTextColor={colors.text.tertiary}
-            style={{ marginTop: spacing['2'], borderWidth: 1, borderColor: colors.border.default, borderRadius: 12, padding: 12, backgroundColor: colors.background.surface, color: colors.text.primary }}
-          />
-        </Card>
-
-        <View style={{ gap: spacing['2'] }}>
-          <Button title={saving ? 'Salvando…' : 'Salvar'} onPress={save} disabled={saving} />
-          <Button title="Voltar" variant="secondary" onPress={() => navigation.goBack()} />
+        <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
+          <View style={{ flex: 1 }}>
+            <Input label="Número *" value={address.number} onChangeText={(v) => update('number', v)} placeholder="123" keyboardType="numeric" />
+          </View>
+          <View style={{ flex: 1.5 }}>
+            <Input label="Complemento" value={address.complement} onChangeText={(v) => update('complement', v)} placeholder="Apt 4B" />
+          </View>
         </View>
-      </View>
+
+        <Input label="Bairro *" value={address.neighborhood} onChangeText={(v) => update('neighborhood', v)} placeholder="Centro" />
+
+        <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
+          <View style={{ flex: 2 }}>
+            <Input label="Cidade *" value={address.city} onChangeText={(v) => update('city', v)} placeholder="São Paulo" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Input label="Estado *" value={address.state} onChangeText={(v) => update('state', v)} placeholder="SP" maxLength={2} autoCapitalize="characters" />
+          </View>
+        </View>
+
+        <Input label="CEP *" value={address.postal_code} onChangeText={(v) => update('postal_code', v)} placeholder="01000-000" keyboardType="numeric" />
+
+        <Input label="Referência" value={address.reference} onChangeText={(v) => update('reference', v)} placeholder="Próximo ao mercado" />
+
+        <View style={{ marginTop: spacing['2'], gap: spacing['2'] }}>
+          <Button title={saving ? 'Salvando...' : 'Salvar endereço'} onPress={save} disabled={saving} />
+          <Button title="Cancelar" onPress={() => navigation.goBack()} variant="ghost" />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

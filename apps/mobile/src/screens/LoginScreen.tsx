@@ -8,6 +8,7 @@ import { supabase } from '../supabaseClient';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { colors, spacing, textStyle } from '../theme';
+import { formatCPF, formatCNPJ, formatPhone, isValidCPF, isValidCNPJ } from '../utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -25,26 +26,80 @@ export default function LoginScreen({ navigation }: Props) {
 
   const [loading, setLoading] = useState(false);
 
+  function switchMode() {
+    const next = mode === 'login' ? 'signup' : 'login';
+    setMode(next);
+    // Clear signup-only fields when switching modes
+    if (next === 'login') {
+      setFullName('');
+      setDocType('cpf');
+      setDocNumber('');
+      setPhone('');
+    }
+  }
+
+  function handleDocNumberChange(value: string) {
+    if (docType === 'cpf') {
+      setDocNumber(formatCPF(value));
+    } else {
+      setDocNumber(formatCNPJ(value));
+    }
+  }
+
+  function handleDocTypeSwitch(next: 'cpf' | 'cnpj') {
+    if (next === docType) return;
+    setDocType(next);
+    setDocNumber(''); // Clear doc number when switching types
+  }
+
   async function onSubmit() {
+    // Basic validation
+    if (!email.trim()) {
+      Alert.alert('Campo obrigatório', 'Preencha o e-mail.');
+      return;
+    }
+    if (!password) {
+      Alert.alert('Campo obrigatório', 'Preencha a senha.');
+      return;
+    }
+    if (mode === 'signup') {
+      if (password.length < 6) {
+        Alert.alert('Senha fraca', 'A senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+      const rawDoc = docNumber.replace(/\D/g, '');
+      if (rawDoc) {
+        if (docType === 'cpf' && !isValidCPF(rawDoc)) {
+          Alert.alert('CPF inválido', 'Verifique o CPF digitado.');
+          return;
+        }
+        if (docType === 'cnpj' && !isValidCNPJ(rawDoc)) {
+          Alert.alert('CNPJ inválido', 'Verifique o CNPJ digitado.');
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
         navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       } else {
         const redirectTo = (process.env.EXPO_PUBLIC_EMAIL_REDIRECT_URL?.trim() || Linking.createURL('auth/callback'));
+        const rawDoc = docNumber.replace(/\D/g, '');
 
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: {
             emailRedirectTo: redirectTo,
             data: {
               full_name: fullName,
-              phone,
+              phone: phone.replace(/\D/g, ''),
               doc_type: docType,
-              doc_number: docNumber,
+              doc_number: rawDoc,
               company_name: docType === 'cnpj' ? fullName : undefined,
             },
           },
@@ -57,9 +112,9 @@ export default function LoginScreen({ navigation }: Props) {
             .from('profiles')
             .update({
               full_name: fullName || null,
-              phone: phone || null,
-              cpf: docType === 'cpf' ? docNumber : null,
-              cnpj: docType === 'cnpj' ? docNumber : null,
+              phone: phone.replace(/\D/g, '') || null,
+              cpf: docType === 'cpf' ? rawDoc : null,
+              cnpj: docType === 'cnpj' ? rawDoc : null,
               company_name: docType === 'cnpj' ? fullName : null,
               role: 'buyer',
             })
@@ -70,7 +125,7 @@ export default function LoginScreen({ navigation }: Props) {
           'Conta criada',
           'Enviamos um e-mail de confirmação. Ao confirmar, o app deve abrir automaticamente. Depois, faça login com e-mail e senha.'
         );
-        setMode('login');
+        switchMode(); // Switch back to login mode
       }
     } catch (e: any) {
       Alert.alert('Erro', e?.message ?? 'Falha');
@@ -81,7 +136,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
-      <ScrollView contentContainerStyle={{ padding: spacing['5'], gap: spacing['3'] }}>
+      <ScrollView contentContainerStyle={{ padding: spacing['5'], gap: spacing['3'] }} keyboardShouldPersistTaps="handled">
         <Text style={textStyle('display')}>LotePro</Text>
         <Text style={[textStyle('small'), { color: colors.text.secondary }]}
         >
@@ -113,13 +168,13 @@ export default function LoginScreen({ navigation }: Props) {
               <View style={{ flexDirection: 'row', gap: spacing['2'] }}>
                 <Button
                   title={docType === 'cpf' ? '✓ CPF' : 'CPF'}
-                  onPress={() => setDocType('cpf')}
+                  onPress={() => handleDocTypeSwitch('cpf')}
                   variant={docType === 'cpf' ? 'primary' : 'secondary'}
                   size="sm"
                 />
                 <Button
                   title={docType === 'cnpj' ? '✓ CNPJ' : 'CNPJ'}
-                  onPress={() => setDocType('cnpj')}
+                  onPress={() => handleDocTypeSwitch('cnpj')}
                   variant={docType === 'cnpj' ? 'primary' : 'secondary'}
                   size="sm"
                 />
@@ -129,7 +184,7 @@ export default function LoginScreen({ navigation }: Props) {
             <Input
               label={docType.toUpperCase()}
               value={docNumber}
-              onChangeText={setDocNumber}
+              onChangeText={handleDocNumberChange}
               placeholder={docType === 'cpf' ? '000.000.000-00' : '00.000.000/0001-00'}
               keyboardType="number-pad"
             />
@@ -137,7 +192,7 @@ export default function LoginScreen({ navigation }: Props) {
             <Input
               label="Telefone (recomendado)"
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(v) => setPhone(formatPhone(v))}
               placeholder="(11) 99999-9999"
               keyboardType="phone-pad"
             />
@@ -148,7 +203,7 @@ export default function LoginScreen({ navigation }: Props) {
 
         <Button
           title={mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
-          onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}
+          onPress={switchMode}
           disabled={loading}
           variant="ghost"
         />

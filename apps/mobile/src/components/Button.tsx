@@ -21,7 +21,7 @@ export default function Button({
   disabled,
   loading,
 }: Props) {
-  const v = theme.components.button.variants[variant];
+  const v = theme.components.button.variants[variant] as any;
   const bg = disabled ? resolveColor(v.bgDisabled ?? v.bg) : resolveColor(v.bg);
   const textColor = disabled ? resolveColor(v.textDisabled ?? v.text) : resolveColor(v.text);
 
