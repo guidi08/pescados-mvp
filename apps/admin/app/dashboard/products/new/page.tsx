@@ -156,7 +156,15 @@ export default function NewProductPage() {
           </div>
           <div>
             <label className="label">Categoria</label>
-            <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex: Salmão" />
+            <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">Selecione...</option>
+              <option value="Peixes">Peixes</option>
+              <option value="Salmão">Salmão</option>
+              <option value="Camarão">Camarão</option>
+              <option value="Crustáceos">Crustáceos</option>
+              <option value="Mariscos">Mariscos</option>
+              <option value="Outros">Outros</option>
+            </select>
           </div>
         </div>
 
