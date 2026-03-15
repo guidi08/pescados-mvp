@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function AuthCallbackPage() {
+function CallbackContent() {
   const params = useSearchParams();
 
   useEffect(() => {
     const qp = params.toString();
     const deepLink = `lotepro://auth/callback?${qp}`;
-    // Attempt to open the app
     window.location.href = deepLink;
   }, [params]);
 
@@ -27,5 +26,13 @@ export default function AuthCallbackPage() {
         Caso esteja no computador, abra o app no celular e tente novamente.
       </p>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32, fontFamily: 'sans-serif' }}><h1>Carregando…</h1></div>}>
+      <CallbackContent />
+    </Suspense>
   );
 }
