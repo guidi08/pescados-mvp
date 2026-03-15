@@ -43,7 +43,7 @@ export default function NewProductPage() {
         .single();
 
       if (!profile?.seller_id) {
-        setMsg('Seu usuário não está vinculado a um fornecedor (seller_id).');
+        setMsg('Seu usuario nao esta vinculado a um fornecedor (seller_id).');
         setLoading(false);
         return;
       }
@@ -53,37 +53,21 @@ export default function NewProductPage() {
     })();
   }, []);
 
-
   async function triggerAi(productId: string) {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!apiBase) {
-      console.warn('Faltou NEXT_PUBLIC_API_BASE_URL no ambiente do portal.');
-      return false;
-    }
+    if (!apiBase) return false;
 
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
-    if (!token) {
-      console.warn('Sessão expirada.');
-      return false;
-    }
+    if (!token) return false;
 
     const resp = await fetch(`${apiBase}/ai/classify-product`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'authorization': `Bearer ${token}`,
-      },
+      headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
       body: JSON.stringify({ productId }),
     });
 
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      console.warn('AI classify failed', err);
-      return false;
-    }
-
-    return true;
+    return resp.ok;
   }
 
   async function createProduct() {
@@ -91,41 +75,27 @@ export default function NewProductPage() {
     setMsg(null);
 
     const basePriceCents = brlToCents(price);
-    if (!name.trim()) {
-      setMsg('Informe o nome do produto.');
-      return;
-    }
-    if (!basePriceCents || basePriceCents <= 0) {
-      setMsg('Informe um preço válido.');
-      return;
-    }
+    if (!name.trim()) { setMsg('Informe o nome do produto.'); return; }
+    if (!basePriceCents || basePriceCents <= 0) { setMsg('Informe um preco valido.'); return; }
 
     const insert: any = {
       seller_id: sellerId,
       name: name.trim(),
-      description: description.trim() ? description.trim() : null,
-      category: category.trim() ? category.trim() : null,
+      description: description.trim() || null,
+      category: category.trim() || null,
       unit: unit.trim() || 'un',
       pricing_mode: pricingMode,
       estimated_box_weight_kg: pricingMode === 'per_kg_box' ? Number(estimatedBoxWeightKg) : 0,
       max_weight_variation_pct: pricingMode === 'per_kg_box' ? Number(maxVarPct) : 0,
       fresh,
       tags: tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : null,
-      min_expiry_date: minExpiry.trim() ? minExpiry.trim() : null,
+      min_expiry_date: minExpiry.trim() || null,
       base_price_cents: basePriceCents,
       active,
     };
 
-    const { data, error } = await supabase
-      .from('products')
-      .insert(insert)
-      .select('id')
-      .single();
-
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
+    const { data, error } = await supabase.from('products').insert(insert).select('id').single();
+    if (error) { setMsg(error.message); return; }
 
     await triggerAi(data.id);
     window.location.href = `/dashboard/products/${data.id}`;
@@ -134,104 +104,105 @@ export default function NewProductPage() {
   if (loading) {
     return (
       <div className="container">
-        <div className="card">Carregando...</div>
+        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+          <p style={{ color: 'var(--text-secondary)' }}>Carregando...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <div className="row inline" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <h2>Novo produto</h2>
-        <a className="btn secondary" href="/dashboard">Voltar</a>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Novo produto</h2>
+        <a className="btn ghost sm" href="/dashboard">&larr; Voltar</a>
       </div>
 
-      {msg ? <div className="card" style={{ border: '1px solid #ffd2d2', color: '#a00', marginBottom: 12 }}>{msg}</div> : null}
+      {msg && <div className="msg-error" style={{ marginBottom: 16 }}>{msg}</div>}
 
-      <div className="card">
-        <div className="row">
+      <div className="card card-accent">
+        <div className="row" style={{ marginBottom: 16 }}>
           <div>
             <label className="label">Nome</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Salmão fresco" />
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Salmao fresco" />
           </div>
           <div>
             <label className="label">Categoria</label>
             <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="">Selecione...</option>
               <option value="Peixes">Peixes</option>
-              <option value="Salmão">Salmão</option>
-              <option value="Camarão">Camarão</option>
-              <option value="Crustáceos">Crustáceos</option>
+              <option value="Salmao">Salmao</option>
+              <option value="Camarao">Camarao</option>
+              <option value="Crustaceos">Crustaceos</option>
               <option value="Mariscos">Mariscos</option>
               <option value="Outros">Outros</option>
             </select>
           </div>
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <label className="label">Descrição</label>
-          <textarea className="input" style={{ minHeight: 90 }} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <div style={{ marginBottom: 16 }}>
+          <label className="label">Descricao</label>
+          <textarea className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalhes sobre o produto..." />
         </div>
 
-        <div className="row" style={{ marginTop: 12 }}>
+        <div className="row" style={{ marginBottom: 16 }}>
           <div>
-            <label className="label">Preço base (R$)</label>
+            <label className="label">Preco base (R$)</label>
             <input className="input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex: 59,90" />
-            <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-              Para “caixa com peso variável”, este é o preço por kg.
-            </div>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: 12, marginTop: 4 }}>
+              Para "caixa com peso variavel", este e o preco por kg.
+            </p>
           </div>
           <div>
             <label className="label">Unidade</label>
             <input className="input" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="kg / cx / un" />
           </div>
           <div>
-            <label className="label">Modo de preço</label>
+            <label className="label">Modo de preco</label>
             <select className="input" value={pricingMode} onChange={(e) => setPricingMode(e.target.value as any)}>
               <option value="per_unit">Por unidade (kg/un/cx)</option>
-              <option value="per_kg_box">Por kg, vendido por caixa (peso variável)</option>
+              <option value="per_kg_box">Por kg, vendido por caixa (peso variavel)</option>
             </select>
           </div>
         </div>
 
-        {pricingMode === 'per_kg_box' ? (
-          <div className="row" style={{ marginTop: 12 }}>
+        {pricingMode === 'per_kg_box' && (
+          <div className="row" style={{ marginBottom: 16 }}>
             <div>
               <label className="label">Peso estimado por caixa (kg)</label>
               <input className="input" value={estimatedBoxWeightKg} onChange={(e) => setEstimatedBoxWeightKg(e.target.value)} />
             </div>
             <div>
-              <label className="label">Variação máx. (%)</label>
+              <label className="label">Variacao max. (%)</label>
               <input className="input" value={maxVarPct} onChange={(e) => setMaxVarPct(e.target.value)} />
             </div>
           </div>
-        ) : null}
+        )}
 
-        <div className="row" style={{ marginTop: 12 }}>
+        <div className="row" style={{ marginBottom: 16 }}>
           <div>
-            <label className="label">Tags (separadas por vírgula)</label>
+            <label className="label">Tags (separadas por virgula)</label>
             <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Ex: Fresco, Sushi grade" />
           </div>
           <div>
-            <label className="label">Validade mínima (YYYY-MM-DD)</label>
-            <input className="input" value={minExpiry} onChange={(e) => setMinExpiry(e.target.value)} placeholder="2026-02-20" />
+            <label className="label">Validade minima</label>
+            <input className="input" type="date" value={minExpiry} onChange={(e) => setMinExpiry(e.target.value)} />
           </div>
         </div>
 
-        <div className="row inline" style={{ marginTop: 12, gap: 16 }}>
-          <label className="row inline" style={{ gap: 8 }}>
+        <div style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
             <input type="checkbox" checked={fresh} onChange={(e) => setFresh(e.target.checked)} />
             Fresco
           </label>
-          <label className="row inline" style={{ gap: 8 }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
             Ativo
           </label>
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <button className="btn" onClick={createProduct}>Criar</button>
-        </div>
+        <button className="btn" onClick={createProduct} style={{ width: '100%' }}>Criar produto</button>
       </div>
     </div>
   );

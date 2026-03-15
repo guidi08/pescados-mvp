@@ -46,39 +46,95 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="container">
-      <div className="card" style={{ maxWidth: 520, margin: '0 auto' }}>
-        <h1>{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>
-        <p style={{ color: '#555' }}>
-          Acesso para indústrias/distribuidoras cadastradas.
-        </p>
-
-        <div style={{ marginTop: 16 }}>
-          <label className="label">E-mail</label>
-          <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" />
+    <div className="login-wrapper">
+      {/* Brand Panel */}
+      <div className="login-brand">
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ fontSize: 40, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
+            LotePro
+          </h1>
+          <p style={{ fontSize: 18, opacity: 0.85, marginTop: 8, fontWeight: 400 }}>
+            Portal do Fornecedor
+          </p>
+          <div style={{
+            width: 48,
+            height: 3,
+            background: 'rgba(255,255,255,0.4)',
+            borderRadius: 2,
+            margin: '24px auto 0',
+          }} />
+          <p style={{ fontSize: 14, opacity: 0.65, marginTop: 24, lineHeight: 1.6 }}>
+            Gerencie seus produtos, pedidos e recebimentos em um s&oacute; lugar.
+          </p>
         </div>
+      </div>
 
-        <div style={{ marginTop: 12 }}>
-          <label className="label">Senha</label>
-          <input className="input" value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" />
-        </div>
+      {/* Form Panel */}
+      <div className="login-form">
+        <div style={{ width: '100%', maxWidth: 440 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+            {mode === 'login' ? 'Entrar' : 'Criar conta'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', marginTop: 8, marginBottom: 32, fontSize: 15 }}>
+            Acesso para industrias/distribuidoras cadastradas.
+          </p>
 
-        {msg && <p style={{ marginTop: 12 }}>{msg}</p>}
+          <div style={{ marginBottom: 20 }}>
+            <label className="label">E-mail</label>
+            <input
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@empresa.com"
+              type="email"
+              autoComplete="email"
+            />
+          </div>
 
-        <div style={{ marginTop: 16 }} className="row">
-          <button className="btn" onClick={submit} disabled={loading}>
-            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar'}
+          <div style={{ marginBottom: 24 }}>
+            <label className="label">Senha</label>
+            <input
+              className="input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="Min. 6 caracteres"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+          </div>
+
+          {msg && (
+            <div className={msg.includes('Erro') || msg.includes('error') ? 'msg-error' : 'msg-success'} style={{ marginBottom: 20 }}>
+              {msg}
+            </div>
+          )}
+
+          <button
+            className="btn"
+            onClick={submit}
+            disabled={loading}
+            style={{ width: '100%', marginBottom: 12 }}
+          >
+            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
           </button>
 
           <button
-            className="btn secondary"
-            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            className="btn ghost"
+            onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMsg(null); }}
             disabled={loading}
+            style={{ width: '100%' }}
           >
-            {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
+            {mode === 'login' ? 'Criar conta' : 'Ja tenho conta'}
           </button>
+
+          <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 32, textAlign: 'center', lineHeight: 1.5 }}>
+            Dica antifraude: mantenha confirmacao de e-mail ativa.
+            <br />
+            Para fornecedores, use o Portal do Fornecedor.
+          </p>
         </div>
       </div>
+
     </div>
   );
 }

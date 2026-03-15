@@ -61,7 +61,7 @@ const DAY_OPTIONS = [
   { value: 3, label: 'Qua' },
   { value: 4, label: 'Qui' },
   { value: 5, label: 'Sex' },
-  { value: 6, label: 'Sáb' },
+  { value: 6, label: 'Sab' },
   { value: 7, label: 'Dom' },
 ];
 
@@ -95,7 +95,7 @@ export default function DashboardPage() {
       .single();
 
     if (profErr) {
-      setMsg('Não foi possível carregar seu perfil. Verifique RLS e se o trigger de profile está ativo.');
+      setMsg('Nao foi possivel carregar seu perfil. Verifique RLS e se o trigger de profile esta ativo.');
       setLoading(false);
       return;
     }
@@ -103,7 +103,7 @@ export default function DashboardPage() {
     setProfile(prof as any);
 
     if (!(prof as any).seller_id) {
-      setMsg('Seu usuário não está vinculado a um fornecedor (profiles.seller_id).');
+      setMsg('Seu usuario nao esta vinculado a um fornecedor (seller_id).');
       setLoading(false);
       return;
     }
@@ -121,7 +121,6 @@ export default function DashboardPage() {
     if (pErr) setMsg(pErr.message);
     setProducts((prods ?? []) as any);
 
-    // Realtime updates: products
     const channel = supabase
       .channel('realtime-products')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `seller_id=eq.${sid}` }, () => {
@@ -158,7 +157,7 @@ export default function DashboardPage() {
     setMsg(null);
     const { error } = await supabase.from('sellers').update(patch).eq('id', sellerId);
     if (error) setMsg(error.message);
-    else setMsg('Configurações atualizadas ✅');
+    else setMsg('__success__Configuracoes atualizadas');
   }
 
   async function uploadSellerLogo(file: File) {
@@ -178,7 +177,7 @@ export default function DashboardPage() {
       const { data } = supabase.storage.from('seller-logos').getPublicUrl(path);
       const publicUrl = data?.publicUrl ?? null;
 
-      if (!publicUrl) throw new Error('Não foi possível obter URL pública do logo.');
+      if (!publicUrl) throw new Error('Nao foi possivel obter URL publica do logo.');
 
       setSeller((s) => s ? ({ ...s, logo_url: publicUrl }) : s);
       await updateSeller({ logo_url: publicUrl });
@@ -202,7 +201,7 @@ export default function DashboardPage() {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     if (!token) {
-      setMsg('Sessão expirada. Faça login novamente.');
+      setMsg('Sessao expirada. Faca login novamente.');
       return;
     }
 
@@ -224,18 +223,21 @@ export default function DashboardPage() {
     const data = await resp.json();
     if (data?.url) {
       window.location.href = data.url;
-      setMsg('Abrindo o onboarding do Stripe...');
+      setMsg('__success__Abrindo o onboarding do Stripe...');
     } else {
       setMsg('Resposta inesperada do servidor ao gerar onboarding.');
     }
   }
 
+  const isSuccess = msg?.startsWith('__success__');
+  const displayMsg = isSuccess ? msg?.replace('__success__', '') : msg;
+
   if (loading) {
     return (
       <div className="container">
-        <div className="card">
-          <h1>Dashboard</h1>
-          <p>Carregando...</p>
+        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-brand)' }}>LotePro</h1>
+          <p style={{ color: 'var(--text-secondary)', marginTop: 8 }}>Carregando dashboard...</p>
         </div>
       </div>
     );
@@ -243,29 +245,35 @@ export default function DashboardPage() {
 
   return (
     <div className="container">
-      <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Header */}
+      <div className="card" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h1>Dashboard</h1>
-          <p style={{ color: '#555' }}>
-            {seller ? <>Fornecedor: <strong>{seller.display_name}</strong> • Produtos ativos: <strong>{activeCount}</strong></> : '—'}
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Dashboard</h1>
+          <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: 14 }}>
+            {seller ? (
+              <>Fornecedor: <strong>{seller.display_name}</strong> &middot; Produtos ativos: <strong>{activeCount}</strong></>
+            ) : '\u2014'}
           </p>
         </div>
-        <div>
-          <button className="btn secondary" onClick={() => (window.location.href = '/dashboard/products/new')}>+ Novo produto</button>
-          <span style={{ marginLeft: 8 }} />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={() => (window.location.href = '/dashboard/products/new')}>+ Novo produto</button>
           <button className="btn secondary" onClick={() => (window.location.href = '/dashboard/orders')}>Pedidos</button>
-          <span style={{ marginLeft: 8 }} />
-          <button className="btn" onClick={logout}>Sair</button>
+          <button className="btn ghost" onClick={logout}>Sair</button>
         </div>
       </div>
 
-      {msg && <p style={{ marginTop: 12 }}>{msg}</p>}
+      {displayMsg && (
+        <div className={isSuccess ? 'msg-success' : 'msg-error'} style={{ marginBottom: 16 }}>
+          {displayMsg}
+        </div>
+      )}
 
+      {/* Seller Config */}
       {seller && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h2>Configurações do fornecedor</h2>
+        <div className="card card-accent" style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 20px' }}>Configuracoes do fornecedor</h2>
 
-          <div className="row">
+          <div className="row" style={{ marginBottom: 16 }}>
             <div>
               <label className="label">E-mail de pedidos</label>
               <input
@@ -277,14 +285,15 @@ export default function DashboardPage() {
 
             <div>
               <label className="label">Logo do fornecedor</label>
-              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   className="input"
                   value={seller.logo_url ?? ''}
                   onChange={(e) => setSeller({ ...seller, logo_url: e.target.value })}
                   placeholder="https://.../logo.png"
+                  style={{ flex: 1 }}
                 />
-                <label className="btn secondary" style={{ cursor: 'pointer' }}>
+                <label className="btn secondary sm" style={{ cursor: 'pointer', flexShrink: 0 }}>
                   {uploadingLogo ? 'Enviando...' : 'Upload'}
                   <input
                     type="file"
@@ -297,13 +306,11 @@ export default function DashboardPage() {
                   />
                 </label>
               </div>
-              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-                PNG/JPEG até 2MB.
-              </div>
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 12, marginTop: 4 }}>PNG/JPEG ate 2MB.</p>
             </div>
 
             <div>
-              <label className="label">Horário limite (cut-off) para entrega D+1</label>
+              <label className="label">Horario limite (cut-off) D+1</label>
               <input
                 className="input"
                 value={seller.cutoff_time}
@@ -313,7 +320,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
+          <div className="row" style={{ marginBottom: 16 }}>
             <div>
               <label className="label">Frete fixo (R$)</label>
               <input
@@ -326,7 +333,7 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label className="label">Pedido mínimo (R$)</label>
+              <label className="label">Pedido minimo (R$)</label>
               <input
                 className="input"
                 type="number"
@@ -336,11 +343,9 @@ export default function DashboardPage() {
               />
             </div>
 
-            {null}
-
             <div>
               <label className="label">B2C habilitado</label>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 14, fontSize: 14 }}>
                 <input
                   type="checkbox"
                   checked={!!seller.b2c_enabled}
@@ -351,114 +356,110 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="label">Dias de entrega</label>
-              <div className="row" style={{ gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
-                {DAY_OPTIONS.map((d) => (
-                  <label key={d.value} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={(seller.delivery_days ?? [1, 2, 3, 4, 5]).includes(d.value)}
-                      onChange={(e) => {
-                        const current = seller.delivery_days ?? [1, 2, 3, 4, 5];
-                        const next = e.target.checked
-                          ? Array.from(new Set([...current, d.value])).sort((a, b) => a - b)
-                          : current.filter((v) => v !== d.value);
-                        setSeller({ ...seller, delivery_days: next });
-                      }}
-                    />
-                    {d.label}
-                  </label>
-                ))}
-              </div>
-              <div style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-                Regra: sábado entrega terça; domingo entrega segunda. Demais dias seguem cut-off.
-              </div>
+          {/* Delivery days */}
+          <div style={{ marginBottom: 16 }}>
+            <label className="label">Dias de entrega</label>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
+              {DAY_OPTIONS.map((d) => (
+                <label key={d.value} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={(seller.delivery_days ?? [1, 2, 3, 4, 5]).includes(d.value)}
+                    onChange={(e) => {
+                      const current = seller.delivery_days ?? [1, 2, 3, 4, 5];
+                      const next = e.target.checked
+                        ? Array.from(new Set([...current, d.value])).sort((a, b) => a - b)
+                        : current.filter((v) => v !== d.value);
+                      setSeller({ ...seller, delivery_days: next });
+                    }}
+                  />
+                  {d.label}
+                </label>
+              ))}
             </div>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: 12, marginTop: 6 }}>
+              Regra: sabado entrega terca; domingo entrega segunda. Demais dias seguem cut-off.
+            </p>
           </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="label">Recebimentos (Stripe)</label>
-              <div className="row inline" style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span className={`badge ${seller.stripe_account_id ? 'green' : 'gray'}`}>
-                  {seller.stripe_account_id ? 'Conta conectada' : 'Não configurado'}
-                </span>
-                <span className={`badge ${seller.stripe_account_charges_enabled ? 'green' : 'gray'}`}>
-                  {seller.stripe_account_charges_enabled ? 'Charges OK' : 'Charges pendente'}
-                </span>
-                <span className={`badge ${seller.stripe_account_payouts_enabled ? 'green' : 'gray'}`}>
-                  {seller.stripe_account_payouts_enabled ? 'Payouts OK' : 'Payouts pendente'}
-                </span>
-              </div>
-
-              <div style={{ marginTop: 10 }}>
-                <button className="btn secondary" onClick={openStripeOnboarding}>
-                  Configurar recebimentos (Stripe Connect)
-                </button>
-              </div>
-
-              <div style={{ color: '#666', fontSize: 12, marginTop: 8 }}>
-                * O pedido só pode ser pago quando o fornecedor estiver pronto para receber (conta Stripe conectada).
-              </div>
+          {/* Stripe */}
+          <div style={{ marginBottom: 20 }}>
+            <label className="label">Recebimentos (Stripe)</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              <span className={`badge ${seller.stripe_account_id ? 'success' : 'neutral'}`}>
+                {seller.stripe_account_id ? 'Conta conectada' : 'Nao configurado'}
+              </span>
+              <span className={`badge ${seller.stripe_account_charges_enabled ? 'success' : 'neutral'}`}>
+                {seller.stripe_account_charges_enabled ? 'Charges OK' : 'Charges pendente'}
+              </span>
+              <span className={`badge ${seller.stripe_account_payouts_enabled ? 'success' : 'neutral'}`}>
+                {seller.stripe_account_payouts_enabled ? 'Payouts OK' : 'Payouts pendente'}
+              </span>
             </div>
+            <button className="btn secondary sm" onClick={openStripeOnboarding} style={{ marginTop: 12 }}>
+              Configurar recebimentos (Stripe Connect)
+            </button>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: 12, marginTop: 8 }}>
+              * O pedido so pode ser pago quando o fornecedor estiver pronto para receber (conta Stripe conectada).
+            </p>
           </div>
 
-          <div style={{ marginTop: 12 }}>
-            <button className="btn" onClick={() => updateSeller({
+          <button
+            className="btn"
+            style={{ width: '100%' }}
+            onClick={() => updateSeller({
               order_email: seller.order_email,
               logo_url: seller.logo_url ?? null,
               cutoff_time: seller.cutoff_time,
               shipping_fee_cents: seller.shipping_fee_cents,
               min_order_cents: seller.min_order_cents,
               b2c_enabled: seller.b2c_enabled,
-              // risk_reserve_bps removido
               delivery_days: seller.delivery_days ?? [1, 2, 3, 4, 5],
-            })}>
-              Salvar
-            </button>
-          </div>
+            })}
+          >
+            Salvar configuracoes
+          </button>
         </div>
       )}
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <h2>Produtos</h2>
+      {/* Products */}
+      <div className="card">
+        <h2 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 16px' }}>Produtos</h2>
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
                 <th>Produto</th>
                 <th>Tipo</th>
-                <th>Validade mínima</th>
-                <th>Preço base</th>
+                <th>Validade minima</th>
+                <th>Preco base</th>
                 <th>Status</th>
-                <th>Ações</th>
+                <th>Acoes</th>
               </tr>
             </thead>
             <tbody>
               {products.map((p) => (
                 <tr key={p.id}>
                   <td data-label="Produto">
-                    <div><strong>{p.name}</strong></div>
-                    <div style={{ color: '#666', fontSize: 12 }}>
-                      {p.unit} • {p.pricing_mode === 'per_kg_box' ? 'por caixa (peso variável)' : 'por unidade'} • atualizado {new Date(p.updated_at).toLocaleString('pt-BR')}
+                    <div style={{ fontWeight: 600 }}>{p.name}</div>
+                    <div style={{ color: 'var(--text-tertiary)', fontSize: 12, marginTop: 2 }}>
+                      {p.unit} &middot; {p.pricing_mode === 'per_kg_box' ? 'por caixa (peso variavel)' : 'por unidade'} &middot; {new Date(p.updated_at).toLocaleString('pt-BR')}
                     </div>
                   </td>
                   <td data-label="Tipo">
-                    <span className={`badge ${p.fresh ? 'green' : 'gray'}`}>{p.fresh ? 'Fresco' : 'Congelado'}</span>
-                    <div style={{ marginTop: 6 }}>
-                      <label style={{ fontSize: 12 }}>
+                    <span className={`badge ${p.fresh ? 'fresh' : 'frozen'}`}>{p.fresh ? 'Fresco' : 'Congelado'}</span>
+                    <div style={{ marginTop: 8 }}>
+                      <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={p.fresh}
                           onChange={(e) => updateProduct(p.id, { fresh: e.target.checked })}
-                        />{' '}
+                        />
                         Fresco
                       </label>
                     </div>
                   </td>
-                  <td data-label="Validade mínima">
+                  <td data-label="Validade minima">
                     <input
                       className="input"
                       style={{ maxWidth: 160 }}
@@ -467,7 +468,7 @@ export default function DashboardPage() {
                       onChange={(e) => updateProduct(p.id, { min_expiry_date: e.target.value || null })}
                     />
                   </td>
-                  <td data-label="Preço base">
+                  <td data-label="Preco base">
                     <input
                       className="input"
                       style={{ maxWidth: 140 }}
@@ -479,29 +480,30 @@ export default function DashboardPage() {
                         if (Number.isFinite(v)) updateProduct(p.id, { base_price_cents: Math.round(v * 100) });
                       }}
                     />
-                    <div style={{ color: '#666', fontSize: 12 }}>
+                    <div style={{ color: 'var(--text-tertiary)', fontSize: 12, marginTop: 4 }}>
                       {centsToBRL(p.base_price_cents)} / {p.pricing_mode === 'per_kg_box' ? 'kg' : p.unit}
-                      {p.pricing_mode === 'per_kg_box' && p.estimated_box_weight_kg ? ` • ~${p.estimated_box_weight_kg}kg/cx` : ''}
+                      {p.pricing_mode === 'per_kg_box' && p.estimated_box_weight_kg ? ` \u2022 ~${p.estimated_box_weight_kg}kg/cx` : ''}
                     </div>
                   </td>
                   <td data-label="Status">
-                    <span className={`badge ${p.active ? 'green' : 'gray'}`}>{p.active ? 'Ativo' : 'Pausado'}</span>
+                    <span className={`badge ${p.active ? 'success' : 'neutral'}`}>{p.active ? 'Ativo' : 'Pausado'}</span>
                   </td>
-                  <td data-label="Ações">
-                    <button className="btn secondary" onClick={() => updateProduct(p.id, { active: !p.active })}>
-                      {p.active ? 'Pausar' : 'Reativar'}
-                    </button>
-                    <span style={{ marginLeft: 8 }} />
-                    <button className="btn secondary" onClick={() => (window.location.href = `/dashboard/products/${p.id}`)}>
-                      Variantes
-                    </button>
+                  <td data-label="Acoes">
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="btn secondary sm" onClick={() => updateProduct(p.id, { active: !p.active })}>
+                        {p.active ? 'Pausar' : 'Reativar'}
+                      </button>
+                      <button className="btn ghost sm" onClick={() => (window.location.href = `/dashboard/products/${p.id}`)}>
+                        Variantes
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {!products.length && (
                 <tr>
-                  <td colSpan={6} style={{ color: '#666' }}>
-                    Nenhum produto cadastrado.
+                  <td colSpan={6} style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: 32 }}>
+                    Nenhum produto cadastrado. Clique em "+ Novo produto" para comecar.
                   </td>
                 </tr>
               )}

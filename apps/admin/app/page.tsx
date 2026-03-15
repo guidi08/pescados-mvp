@@ -28,36 +28,36 @@ export default function Home() {
           return;
         }
 
-        // Buyer account (or supplier not linked yet)
         setIsBuyer(true);
       })
       .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="container">
-      <div className="card">
-        <h1>Portal do Fornecedor</h1>
+    <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div className="card" style={{ maxWidth: 480, textAlign: 'center', padding: 40 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px', color: 'var(--color-brand)' }}>
+          LotePro
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 15, margin: '0 0 24px' }}>
+          Portal do Fornecedor
+        </p>
 
-        {loading ? <p>Carregando...</p> : null}
+        {loading && <p style={{ color: 'var(--text-tertiary)' }}>Carregando...</p>}
 
-        {!loading && !isBuyer ? <p>Redirecionando...</p> : null}
+        {!loading && !isBuyer && <p style={{ color: 'var(--text-tertiary)' }}>Redirecionando...</p>}
 
-        {!loading && isBuyer ? (
+        {!loading && isBuyer && (
           <>
-            <p>
-              Sua conta está confirmada, mas não está vinculada a um fornecedor.
-              <br />
+            <div className="msg-error" style={{ textAlign: 'left', marginBottom: 24 }}>
+              Sua conta esta confirmada, mas nao esta vinculada a um fornecedor.
               Para comprar, volte ao app <b>LotePro</b>.
-            </p>
+            </div>
 
-            <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 className="btn"
-                onClick={() => {
-                  // Deep link (funciona se o app estiver instalado)
-                  window.location.href = 'lotepro://';
-                }}
+                onClick={() => { window.location.href = 'lotepro://'; }}
               >
                 Abrir LotePro
               </button>
@@ -72,7 +72,7 @@ export default function Home() {
               </button>
             </div>
           </>
-        ) : null}
+        )}
       </div>
     </div>
   );

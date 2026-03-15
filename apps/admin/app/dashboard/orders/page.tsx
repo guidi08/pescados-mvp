@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 
 function centsToBRL(cents: number): string {
@@ -24,10 +24,7 @@ export default function OrdersPage() {
 
     const { data: sessionData } = await supabase.auth.getSession();
     const session = sessionData.session;
-    if (!session) {
-      window.location.href = '/login';
-      return;
-    }
+    if (!session) { window.location.href = '/login'; return; }
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -36,7 +33,7 @@ export default function OrdersPage() {
       .single();
 
     if (!profile?.seller_id) {
-      setMsg('Seu usuário não está vinculado a um fornecedor (seller_id).');
+      setMsg('Seu usuario nao esta vinculado a um fornecedor (seller_id).');
       setLoading(false);
       return;
     }
@@ -55,9 +52,7 @@ export default function OrdersPage() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   async function openOrder(orderId: string) {
     setSelectedOrderId(orderId);
@@ -88,17 +83,11 @@ export default function OrdersPage() {
     setMsg(null);
 
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!apiBase) {
-      setMsg('Faltou NEXT_PUBLIC_API_BASE_URL no ambiente do portal.');
-      return;
-    }
+    if (!apiBase) { setMsg('Faltou NEXT_PUBLIC_API_BASE_URL no ambiente do portal.'); return; }
 
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
-    if (!token) {
-      setMsg('Sessão expirada. Faça login novamente.');
-      return;
-    }
+    if (!token) { setMsg('Sessao expirada. Faca login novamente.'); return; }
 
     const payloadItems = selectedItems
       .filter((it) => it.pricing_mode_snapshot === 'per_kg_box')
@@ -108,17 +97,11 @@ export default function OrdersPage() {
       }))
       .filter((x) => Number.isFinite(x.actualTotalWeightKg) && x.actualTotalWeightKg > 0);
 
-    if (!payloadItems.length) {
-      setMsg('Nenhum item com peso variável para atualizar.');
-      return;
-    }
+    if (!payloadItems.length) { setMsg('Nenhum item com peso variavel para atualizar.'); return; }
 
     const resp = await fetch(`${apiBase}/orders/${selectedOrderId}/weights`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'authorization': `Bearer ${token}`,
-      },
+      headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
       body: JSON.stringify({ items: payloadItems }),
     });
 
@@ -129,28 +112,42 @@ export default function OrdersPage() {
     }
 
     const ok = await resp.json().catch(() => ({}));
-    setMsg(`Pesos atualizados ✅ (delta: ${centsToBRL(ok.deltaCents ?? 0)})`);
+    setMsg(`__success__Pesos atualizados (delta: ${centsToBRL(ok.deltaCents ?? 0)})`);
     await openOrder(selectedOrderId);
   }
+
+  const isSuccess = msg?.startsWith('__success__');
+  const displayMsg = isSuccess ? msg?.replace('__success__', '') : msg;
 
   if (loading) {
     return (
       <div className="container">
-        <div className="card">Carregando...</div>
+        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+          <p style={{ color: 'var(--text-secondary)' }}>Carregando pedidos...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <div className="row inline" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <h2>Pedidos</h2>
-        <a className="btn secondary" href="/dashboard">Voltar</a>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Pedidos</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn ghost sm" onClick={load}>Atualizar</button>
+          <a className="btn ghost sm" href="/dashboard">&larr; Voltar</a>
+        </div>
       </div>
 
-      {msg ? <div className="card" style={{ border: '1px solid #ffd2d2', color: msg.includes('✅') ? '#0a0' : '#a00', marginBottom: 12 }}>{msg}</div> : null}
+      {displayMsg && (
+        <div className={isSuccess ? 'msg-success' : 'msg-error'} style={{ marginBottom: 16 }}>
+          {displayMsg}
+        </div>
+      )}
 
-      <div className="card" style={{ marginBottom: 12 }}>
+      {/* Orders table */}
+      <div className="card" style={{ marginBottom: 20 }}>
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -167,31 +164,51 @@ export default function OrdersPage() {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id}>
-                  <td data-label="ID" style={{ fontFamily: 'monospace', fontSize: 12 }}>{o.id.slice(0, 8)}…</td>
+                  <td data-label="ID" style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-tertiary)' }}>{o.id.slice(0, 8)}&hellip;</td>
                   <td data-label="Data">{new Date(o.created_at).toLocaleString('pt-BR')}</td>
                   <td data-label="Entrega">{o.delivery_date}</td>
-                  <td data-label="Canal">{o.buyer_channel?.toUpperCase()}</td>
-                  <td data-label="Status">
-                    <span className={`badge ${o.payment_status === 'succeeded' ? 'green' : 'gray'}`}>{o.status} / {o.payment_status}</span>
-                    {o.contains_fresh ? <span className="badge" style={{ marginLeft: 8 }}>Fresco</span> : null}
+                  <td data-label="Canal">
+                    <span className={`badge ${o.buyer_channel === 'b2b' ? 'b2b' : 'b2c'}`}>
+                      {o.buyer_channel?.toUpperCase()}
+                    </span>
                   </td>
-                  <td data-label="Total">{centsToBRL(o.total_cents)}</td>
-                  <td data-label="Ações">
-                    <button className="btn secondary" onClick={() => openOrder(o.id)}>Detalhes</button>
+                  <td data-label="Status">
+                    <span className={`badge ${o.payment_status === 'succeeded' ? 'success' : 'neutral'}`}>
+                      {o.status} / {o.payment_status}
+                    </span>
+                    {o.contains_fresh && <span className="badge fresh" style={{ marginLeft: 6 }}>Fresco</span>}
+                  </td>
+                  <td data-label="Total" style={{ fontWeight: 600 }}>{centsToBRL(o.total_cents)}</td>
+                  <td data-label="Acoes">
+                    <button className="btn secondary sm" onClick={() => openOrder(o.id)}>Detalhes</button>
                   </td>
                 </tr>
               ))}
+              {!orders.length && (
+                <tr>
+                  <td colSpan={7} style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: 32 }}>
+                    Nenhum pedido encontrado.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {selectedOrderId && selectedOrder ? (
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Pedido {selectedOrderId}</h3>
-          <div style={{ color: '#666', fontSize: 12, marginBottom: 12 }}>
-            Atualize pesos apenas para itens “por caixa com peso variável”. Isso gera ajuste automático no saldo do cliente (B2B).
+      {/* Order Detail */}
+      {selectedOrderId && selectedOrder && (
+        <div className="card card-accent">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Pedido {selectedOrderId.slice(0, 8)}&hellip;</h3>
+            <button className="btn ghost sm" onClick={() => { setSelectedOrderId(null); setSelectedOrder(null); setSelectedItems([]); }}>
+              Fechar
+            </button>
           </div>
+
+          <p style={{ color: 'var(--text-tertiary)', fontSize: 13, marginBottom: 16 }}>
+            Atualize pesos apenas para itens "por caixa com peso variavel". Isso gera ajuste automatico no saldo do cliente (B2B).
+          </p>
 
           <div className="table-wrap">
             <table className="table">
@@ -207,21 +224,26 @@ export default function OrdersPage() {
               <tbody>
                 {selectedItems.map((it) => (
                   <tr key={it.id}>
-                    <td data-label="Item">{it.product_name_snapshot} {it.variant_name_snapshot ? `(${it.variant_name_snapshot})` : ''}</td>
-                    <td data-label="Modo">{it.pricing_mode_snapshot}</td>
+                    <td data-label="Item" style={{ fontWeight: 500 }}>
+                      {it.product_name_snapshot}
+                      {it.variant_name_snapshot && <span style={{ color: 'var(--text-tertiary)' }}> ({it.variant_name_snapshot})</span>}
+                    </td>
+                    <td data-label="Modo">
+                      <span className={`badge ${it.pricing_mode_snapshot === 'per_kg_box' ? 'warning' : 'neutral'}`}>
+                        {it.pricing_mode_snapshot === 'per_kg_box' ? 'Peso variavel' : 'Por unidade'}
+                      </span>
+                    </td>
                     <td data-label="Qtd">{it.quantity}</td>
-                    <td data-label="Estimado">{it.estimated_total_weight_kg_snapshot ?? '—'}</td>
+                    <td data-label="Estimado">{it.estimated_total_weight_kg_snapshot ?? '\u2014'}</td>
                     <td data-label="Peso real">
                       {it.pricing_mode_snapshot === 'per_kg_box' ? (
                         <input
                           className="input"
-                          style={{ width: 140 }}
+                          style={{ maxWidth: 140 }}
                           value={weightsDraft[it.id] ?? ''}
                           onChange={(e) => setWeightsDraft({ ...weightsDraft, [it.id]: e.target.value })}
                         />
-                      ) : (
-                        '—'
-                      )}
+                      ) : '\u2014'}
                     </td>
                   </tr>
                 ))}
@@ -229,16 +251,11 @@ export default function OrdersPage() {
             </table>
           </div>
 
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
             <button className="btn" onClick={submitWeights}>Salvar pesos</button>
-            <button className="btn secondary" style={{ marginLeft: 8 }} onClick={() => { setSelectedOrderId(null); setSelectedOrder(null); setSelectedItems([]); }}>Fechar</button>
           </div>
         </div>
-      ) : null}
-
-      <div style={{ marginTop: 12 }}>
-        <button className="btn secondary" onClick={load}>Atualizar lista</button>
-      </div>
+      )}
     </div>
   );
 }
