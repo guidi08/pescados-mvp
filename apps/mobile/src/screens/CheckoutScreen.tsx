@@ -3,7 +3,7 @@ import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } fro
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
 import { useBuyer } from '../context/BuyerContext';
-import { createOrder, createPaymentSheet, createPixPayment } from '../api';
+import { createOrder, createPaymentSheet, createManualPixPayment } from '../api';
 import { supabase } from '../supabaseClient';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -190,19 +190,14 @@ export default function CheckoutScreen({ navigation }: any) {
         deliveryAddress: address || undefined,
       });
 
-      const pix = await createPixPayment(order.orderId);
+      const result = await createManualPixPayment(order.orderId);
 
-      if (!pix.pix) {
-        Alert.alert(
-          'Pix indispon\u00edvel',
-          'Este ambiente/conta pode n\u00e3o ter Pix habilitado no provedor. Tente cart\u00e3o.'
-        );
-        return;
-      }
-
-      // Navigate to Pix screen — DON'T clear cart until payment is confirmed
-      // The cart will be cleared when the user returns from Pix or the order updates to 'paid'
-      navigation.navigate('Pix', { orderId: order.orderId, pix: pix.pix, total: pix.total });
+      // Navigate to Pix screen with manual PIX data
+      navigation.navigate('Pix', {
+        orderId: order.orderId,
+        pix: { data: result.pixCode },
+        total: result.total,
+      });
       // Clear after navigating so user can't double-submit
       clear();
     } catch (e: any) {

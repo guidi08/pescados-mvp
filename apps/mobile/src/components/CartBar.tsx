@@ -57,15 +57,8 @@ export default function CartBar({
   const insets = useSafeAreaInsets();
 
   const routeName = currentRouteName ?? navigationRef.getCurrentRoute?.()?.name;
-  if (routeName && HIDE_ON.has(routeName)) return null;
-  if (!items.length) return null;
 
   const kg = useMemo(() => estimateCartKg(items as any), [items]);
-
-  const bottomOffset =
-    routeName && TAB_ROUTES.has(routeName)
-      ? (insets.bottom || 0) + 64
-      : (insets.bottom || 0) + 8;
 
   // Smooth entrance (simple)
   const anim = useRef(new Animated.Value(0)).current;
@@ -78,6 +71,15 @@ export default function CartBar({
   }, [anim]);
 
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
+
+  // Hide on certain routes or when cart is empty (after all hooks)
+  if (routeName && HIDE_ON.has(routeName)) return null;
+  if (!items.length) return null;
+
+  const bottomOffset =
+    routeName && TAB_ROUTES.has(routeName)
+      ? (insets.bottom || 0) + 64
+      : (insets.bottom || 0) + 8;
 
   const totalLabel = centsToBRL(subtotalCents);
   const itemsLabel = `${items.length} ${items.length === 1 ? 'item' : 'itens'}`;

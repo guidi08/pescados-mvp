@@ -26,7 +26,7 @@ export default function EntryScreen({ navigation }: Props) {
           <Button
             title="Sou fornecedor"
             variant="secondary"
-            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'SupplierAccess' }] })}
+            onPress={() => navigation.navigate('SupplierAccess')}
           />
         </View>
 

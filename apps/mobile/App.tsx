@@ -16,6 +16,7 @@ if (isStripeAvailable) {
   StripeProvider = require('@stripe/stripe-react-native').StripeProvider;
 }
 
+// Buyer screens
 import EntryScreen from './src/screens/EntryScreen';
 import SupplierAccessScreen from './src/screens/SupplierAccessScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -34,8 +35,18 @@ import AccountScreen from './src/screens/AccountScreen';
 import AddressScreen from './src/screens/AddressScreen';
 import WalletScreen from './src/screens/WalletScreen';
 
+// Supplier screens
+import SupplierDashboardScreen from './src/screens/supplier/SupplierDashboardScreen';
+import SupplierProductsScreen from './src/screens/supplier/SupplierProductsScreen';
+import SupplierProductNewScreen from './src/screens/supplier/SupplierProductNewScreen';
+import SupplierProductDetailScreen from './src/screens/supplier/SupplierProductDetailScreen';
+import SupplierOrdersScreen from './src/screens/supplier/SupplierOrdersScreen';
+import SupplierOrderDetailScreen from './src/screens/supplier/SupplierOrderDetailScreen';
+import SupplierSettingsScreen from './src/screens/supplier/SupplierSettingsScreen';
+
 import { CartProvider } from './src/context/CartContext';
 import { BuyerProvider } from './src/context/BuyerContext';
+import { SellerProvider } from './src/context/SellerContext';
 import CartBar from './src/components/CartBar';
 import { colors } from './src/theme';
 
@@ -60,6 +71,11 @@ export type RootStackParamList = {
   Account: undefined;
   Address: undefined;
   Wallet: undefined;
+  // Supplier
+  SupplierTabs: undefined;
+  SupplierProductNew: undefined;
+  SupplierProductDetail: { productId: string };
+  SupplierOrderDetail: { orderId: string };
 };
 
 export type MainTabParamList = {
@@ -72,8 +88,16 @@ export type MainTabParamList = {
   ProfileTab: undefined;
 };
 
+export type SupplierTabParamList = {
+  PainelTab: undefined;
+  ProdutosTab: undefined;
+  PedidosTab: undefined;
+  ConfigTab: undefined;
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const SupplierTab = createBottomTabNavigator<SupplierTabParamList>();
 
 function TabNavigator() {
   return (
@@ -111,6 +135,48 @@ function TabNavigator() {
   );
 }
 
+function SupplierTabNavigator() {
+  return (
+    <SupplierTab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
+        tabBarStyle: {
+          height: 64,
+          paddingTop: 8,
+          paddingBottom: 10,
+          borderTopColor: colors.border.subtle,
+          backgroundColor: colors.background.surface,
+        },
+        tabBarLabelStyle: { fontSize: 12 },
+        tabBarActiveTintColor: colors.brand.primary,
+        tabBarInactiveTintColor: colors.text.tertiary,
+        tabBarIcon: ({ color, size, focused }) => {
+          const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+            PainelTab: focused ? 'grid' : 'grid-outline',
+            ProdutosTab: focused ? 'cube' : 'cube-outline',
+            PedidosTab: focused ? 'receipt' : 'receipt-outline',
+            ConfigTab: focused ? 'settings' : 'settings-outline',
+          };
+          const name = iconMap[route.name] ?? 'ellipse';
+          return <Ionicons name={name} size={size} color={color} />;
+        },
+      })}
+    >
+      <SupplierTab.Screen name="PainelTab" component={SupplierDashboardScreen} options={{ title: 'Painel' }} />
+      <SupplierTab.Screen name="ProdutosTab" component={SupplierProductsScreen} options={{ title: 'Produtos' }} />
+      <SupplierTab.Screen name="PedidosTab" component={SupplierOrdersScreen} options={{ title: 'Pedidos' }} />
+      <SupplierTab.Screen name="ConfigTab" component={SupplierSettingsScreen} options={{ title: 'Config' }} />
+    </SupplierTab.Navigator>
+  );
+}
+
+// Routes where CartBar should be hidden
+const SUPPLIER_ROUTES = new Set([
+  'SupplierTabs', 'PainelTab', 'ProdutosTab', 'PedidosTab', 'ConfigTab',
+  'SupplierProductNew', 'SupplierProductDetail', 'SupplierOrderDetail',
+]);
+
 export default function App() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
   const [navReady, setNavReady] = useState(false);
@@ -133,6 +199,9 @@ export default function App() {
 
   const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
+  // Check if current route is a supplier route (hide CartBar)
+  const isSupplierRoute = currentRoute ? SUPPLIER_ROUTES.has(currentRoute) : false;
+
   return (
     <SafeAreaProvider>
       <StripeProvider
@@ -140,6 +209,7 @@ export default function App() {
         merchantIdentifier="merchant.com.guestengine.lotepro"
       >
       <BuyerProvider>
+        <SellerProvider>
         <CartProvider>
           <NavigationContainer
             ref={navigationRef}
@@ -167,6 +237,43 @@ export default function App() {
             <Stack.Screen name="AuthCallback" component={AuthCallbackScreen} />
             <Stack.Screen name="MainTabs" component={TabNavigator} />
 
+            {/* Supplier screens */}
+            <Stack.Screen name="SupplierTabs" component={SupplierTabNavigator} />
+            <Stack.Screen
+              name="SupplierProductNew"
+              component={SupplierProductNewScreen}
+              options={{
+                headerShown: true,
+                title: 'Novo Produto',
+                headerTintColor: colors.brand.primary,
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: colors.background.surface },
+              }}
+            />
+            <Stack.Screen
+              name="SupplierProductDetail"
+              component={SupplierProductDetailScreen}
+              options={{
+                headerShown: true,
+                title: 'Produto',
+                headerTintColor: colors.brand.primary,
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: colors.background.surface },
+              }}
+            />
+            <Stack.Screen
+              name="SupplierOrderDetail"
+              component={SupplierOrderDetailScreen}
+              options={{
+                headerShown: true,
+                title: 'Detalhes do Pedido',
+                headerTintColor: colors.brand.primary,
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: colors.background.surface },
+              }}
+            />
+
+            {/* Buyer screens */}
             <Stack.Screen
               name="Seller"
               component={SellerScreen}
@@ -268,12 +375,13 @@ export default function App() {
             />
           </Stack.Navigator>
 
-          {/* Sticky iFood-like bar */}
-          {navReady && navigationRef.current ? (
+          {/* Sticky iFood-like bar — hidden on supplier routes */}
+          {navReady && navigationRef.current && !isSupplierRoute ? (
             <CartBar navigationRef={navigationRef.current} currentRouteName={currentRoute} />
           ) : null}
         </NavigationContainer>
       </CartProvider>
+      </SellerProvider>
     </BuyerProvider>
     </StripeProvider>
   </SafeAreaProvider>

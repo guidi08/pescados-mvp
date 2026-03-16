@@ -12,7 +12,9 @@ import { formatCPF, formatCNPJ, formatPhone, isValidCPF, isValidCNPJ } from '../
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
-export default function LoginScreen({ navigation }: Props) {
+export default function LoginScreen({ navigation, route }: Props) {
+  const role = route.params?.role ?? 'buyer';
+  const isSeller = role === 'seller';
   const [mode, setMode] = useState<'login' | 'signup'>('login');
 
   const [email, setEmail] = useState('');
@@ -83,8 +85,24 @@ export default function LoginScreen({ navigation }: Props) {
     setLoading(true);
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { data: authData, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
+
+        if (isSeller) {
+          // Check if user has seller_id
+          const userId = authData.session?.user?.id;
+          if (userId) {
+            const { data: prof } = await supabase.from('profiles').select('seller_id').eq('id', userId).single();
+            if (prof?.seller_id) {
+              navigation.reset({ index: 0, routes: [{ name: 'SupplierTabs' }] });
+            } else {
+              await supabase.auth.signOut();
+              Alert.alert('Acesso negado', 'Esta conta não está vinculada a um fornecedor. Solicite cadastro.');
+            }
+          }
+          return;
+        }
+
         navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       } else {
         const redirectTo = (process.env.EXPO_PUBLIC_EMAIL_REDIRECT_URL?.trim() || Linking.createURL('auth/callback'));
@@ -138,9 +156,10 @@ export default function LoginScreen({ navigation }: Props) {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
       <ScrollView contentContainerStyle={{ padding: spacing['5'], gap: spacing['3'] }} keyboardShouldPersistTaps="handled">
         <Text style={textStyle('display')}>LotePro</Text>
-        <Text style={[textStyle('small'), { color: colors.text.secondary }]}
-        >
-          {mode === 'login' ? 'Acesse sua conta para comprar.' : 'Crie sua conta (CPF ou CNPJ).'}
+        <Text style={[textStyle('small'), { color: colors.text.secondary }]}>
+          {isSeller
+            ? 'Acesse sua conta de fornecedor.'
+            : mode === 'login' ? 'Acesse sua conta para comprar.' : 'Crie sua conta (CPF ou CNPJ).'}
         </Text>
 
         <Input
@@ -201,16 +220,19 @@ export default function LoginScreen({ navigation }: Props) {
 
         <Button title={loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'} onPress={onSubmit} disabled={loading} />
 
-        <Button
-          title={mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
-          onPress={switchMode}
-          disabled={loading}
-          variant="ghost"
-        />
+        {!isSeller && (
+          <Button
+            title={mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
+            onPress={switchMode}
+            disabled={loading}
+            variant="ghost"
+          />
+        )}
 
-        <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}
-        >
-          Dica antifraude: mantenha confirmação de e-mail ativa. Para fornecedores, use o Portal do Fornecedor.
+        <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}>
+          {isSeller
+            ? 'Contas de fornecedor são criadas pela equipe LotePro.'
+            : 'Dica antifraude: mantenha confirmação de e-mail ativa.'}
         </Text>
       </ScrollView>
     </SafeAreaView>

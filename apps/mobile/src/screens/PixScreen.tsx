@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
@@ -16,11 +16,12 @@ export default function PixScreen({ route, navigation }: Props) {
   const [copied, setCopied] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
+  const pixCode = pix?.data ?? '';
+
   async function copy() {
-    if (pix?.data) {
-      await Clipboard.setStringAsync(pix.data);
+    if (pixCode) {
+      await Clipboard.setStringAsync(pixCode);
       setCopied(true);
-      // Reset after 3 seconds
       setTimeout(() => setCopied(false), 3000);
     }
   }
@@ -36,7 +37,7 @@ export default function PixScreen({ route, navigation }: Props) {
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
         (payload: any) => {
           const newStatus = payload.new?.payment_status;
-          if (newStatus === 'paid' || payload.new?.status === 'paid') {
+          if (newStatus === 'succeeded' || payload.new?.status === 'paid') {
             setPaymentConfirmed(true);
             Alert.alert(
               'Pagamento confirmado! ✅',
@@ -58,26 +59,47 @@ export default function PixScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'] }}>
         <Text style={textStyle('h1')}>Pague com Pix</Text>
         {orderId !== 'saldo' ? (
-          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Pedido: {orderId}</Text>
+          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Pedido: {orderId.slice(0, 8)}...</Text>
         ) : null}
         <Text style={textStyle('h2')}>Total: {total}</Text>
 
         {paymentConfirmed ? (
           <Badge label="Pagamento confirmado ✅" variant="fresh" />
         ) : (
-          <Text style={[textStyle('caption'), { color: colors.text.tertiary }]}>
-            O Pix expira em até 30 minutos. Escaneie o QR Code ou copie o código abaixo.
-          </Text>
+          <Card>
+            <View style={{ gap: spacing['2'] }}>
+              <Text style={[textStyle('bodyStrong'), { color: colors.brand.primary }]}>
+                Como pagar:
+              </Text>
+              <Text style={textStyle('body')}>1. Copie o código PIX abaixo</Text>
+              <Text style={textStyle('body')}>2. Abra o app do seu banco</Text>
+              <Text style={textStyle('body')}>3. Escolha "Pix Copia e Cola"</Text>
+              <Text style={textStyle('body')}>4. Cole o código e confirme o pagamento</Text>
+            </View>
+          </Card>
         )}
 
-        <Card style={{ alignItems: 'center' }}>
-          {pix?.imageUrlPng ? (
-            <Image source={{ uri: pix.imageUrlPng }} style={{ width: 260, height: 260 }} />
-          ) : (
-            <Text style={{ color: colors.text.secondary }}>
-              Não foi possível carregar o QR Code (verifique se Pix está habilitado na Stripe).
+        {/* PIX Code display */}
+        <Card>
+          <Text style={[textStyle('label'), { color: colors.text.secondary, marginBottom: spacing['2'] }]}>
+            Código PIX (copia e cola):
+          </Text>
+          <View style={{
+            backgroundColor: colors.neutral[50],
+            padding: spacing['3'],
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.border.subtle,
+          }}>
+            <Text style={{
+              fontFamily: 'monospace',
+              fontSize: 11,
+              color: colors.text.primary,
+              lineHeight: 18,
+            }} selectable>
+              {pixCode || 'Código PIX indisponível'}
             </Text>
-          )}
+          </View>
         </Card>
 
         <Button
@@ -86,16 +108,12 @@ export default function PixScreen({ route, navigation }: Props) {
           variant={copied ? 'secondary' : 'primary'}
         />
 
-        {pix?.hostedInstructionsUrl ? (
-          <Text style={[textStyle('small'), { color: colors.text.secondary }]}>
-            Dica: se preferir, abra o link de instruções Pix no navegador: {pix.hostedInstructionsUrl}
+        {!paymentConfirmed && (
+          <Text style={[textStyle('caption'), { color: colors.text.tertiary }]}>
+            Após o pagamento, o fornecedor confirmará o recebimento e seu pedido será processado.
+            Você receberá uma notificação quando o pagamento for confirmado.
           </Text>
-        ) : null}
-
-        <Text style={[textStyle('caption'), { color: colors.text.tertiary }]}
-        >
-          Assim que o pagamento for confirmado, o pedido muda para "pago" automaticamente e o fornecedor recebe o pedido por e-mail.
-        </Text>
+        )}
 
         <View style={{ gap: spacing['2'] }}>
           <Button title="Ver meus pedidos" onPress={() => navigation.navigate('Orders')} />

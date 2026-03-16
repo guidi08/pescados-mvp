@@ -9,6 +9,7 @@ import { stripe } from './stripe';
 import { formatBRL } from './utils';
 import { sendOrderEmail } from './email';
 import { classifyProductWithOpenAI, fallbackClassification } from './ai';
+import { generatePixCode } from './pix';
 
 const app = express();
 
@@ -653,6 +654,101 @@ app.post('/payments/stripe/pix', requireAuth, async (req: AuthedRequest, res) =>
     shipping: formatBRL(order.shipping_cents),
     total: formatBRL(order.total_cents),
   });
+});
+
+/**
+ * ---------- PIX Manual (sem Stripe) ----------
+ * Generates a PIX BR Code (copia e cola) using the platform's PIX key.
+ * Payment confirmation is done manually by admin.
+ */
+app.post('/payments/pix-manual', requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = orderIdSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
+
+  const buyerId = req.user!.id;
+  const { orderId } = parsed.data;
+
+  const order = await getOrderForBuyer(orderId, buyerId);
+  if (!order) return res.status(404).json({ error: 'order_not_found' });
+  if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
+
+  // Platform PIX key — configured via env or hardcoded for now
+  const platformPixKey = env.PLATFORM_PIX_KEY ?? '';
+  const platformName = env.PLATFORM_PIX_NAME ?? 'LotePro';
+  const platformCity = env.PLATFORM_PIX_CITY ?? 'Sao Paulo';
+
+  if (!platformPixKey) {
+    return res.status(500).json({ error: 'platform_pix_not_configured' });
+  }
+
+  // Generate transaction ID (short unique ref for reconciliation)
+  const txId = `LP${orderId.replace(/-/g, '').slice(0, 23)}`;
+
+  const amountBrl = order.total_cents / 100;
+
+  const pixCode = generatePixCode({
+    pixKey: platformPixKey,
+    merchantName: platformName,
+    merchantCity: platformCity,
+    amount: amountBrl,
+    txId,
+  });
+
+  // Update order with payment method info
+  await supabaseService
+    .from('orders')
+    .update({
+      payment_provider: 'manual_pix',
+      payment_method: 'pix',
+      payment_status: 'awaiting_confirmation',
+      payment_intent_id: txId, // Use txId as reference
+    })
+    .eq('id', order.id);
+
+  return res.json({
+    pixCode,
+    txId,
+    amount: amountBrl,
+    total: formatBRL(order.total_cents),
+    subtotal: formatBRL(order.subtotal_cents),
+    shipping: formatBRL(order.shipping_cents),
+    expiresInMinutes: 30,
+  });
+});
+
+/**
+ * ---------- Admin: Confirm manual PIX payment ----------
+ * Called by admin after verifying PIX was received.
+ */
+app.post('/admin/orders/:orderId/confirm-payment', requireAuth, async (req: AuthedRequest, res) => {
+  const { orderId } = req.params;
+
+  // Check that user has a seller_id (is an admin/seller)
+  const { data: profile } = await supabaseService
+    .from('profiles')
+    .select('seller_id')
+    .eq('id', req.user!.id)
+    .single();
+
+  if (!profile?.seller_id) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+
+  const { data: order } = await supabaseService
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+
+  if (!order) return res.status(404).json({ error: 'order_not_found' });
+  if (order.status === 'paid') return res.json({ ok: true, message: 'already_paid' });
+  if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
+
+  // Mark as paid + send email (reuse same logic as webhook)
+  const fakePi = { id: order.payment_intent_id ?? `manual_${Date.now()}`, latest_charge: null };
+  await markOrderPaidAndNotify(orderId, fakePi);
+
+  return res.json({ ok: true, message: 'payment_confirmed' });
 });
 
 /**

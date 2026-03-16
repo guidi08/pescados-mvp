@@ -29,6 +29,11 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('LotePro <no-reply@seudominio.com.br>'),
 
+  // PIX manual (sem Stripe)
+  PLATFORM_PIX_KEY: z.string().optional(),
+  PLATFORM_PIX_NAME: z.string().default('LotePro'),
+  PLATFORM_PIX_CITY: z.string().default('Sao Paulo'),
+
   // AI
   OPENAI_API_KEY: z.string().min(10).optional(),
   OPENAI_MODEL: z.string().optional(),

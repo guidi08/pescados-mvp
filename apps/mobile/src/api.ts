@@ -133,6 +133,28 @@ export function createPixPayment(orderId: string) {
   );
 }
 
+export function createManualPixPayment(orderId: string) {
+  return apiRequest<{
+    pixCode: string;
+    txId: string;
+    amount: number;
+    total: string;
+    subtotal: string;
+    shipping: string;
+    expiresInMinutes: number;
+  }>(
+    '/payments/pix-manual',
+    { method: 'POST', body: { orderId } }
+  );
+}
+
+export function confirmManualPayment(orderId: string) {
+  return apiRequest<{ ok: boolean; message: string }>(
+    `/admin/orders/${orderId}/confirm-payment`,
+    { method: 'POST' }
+  );
+}
+
 export function cancelOrder(orderId: string) {
   return apiRequest<{ ok: boolean; status: string }>(`/orders/${orderId}/cancel`, { method: 'POST' });
 }
@@ -160,4 +182,21 @@ export function createWalletTopupPix(amountCents: number) {
     '/wallet/topup/pix',
     { method: 'POST', body: { amountCents } }
   );
+}
+
+// ---- Supplier helpers ----
+
+export function updateOrderWeights(orderId: string, items: Array<{ orderItemId: string; actualTotalWeightKg: number }>) {
+  return apiRequest<{ deltaCents: number; delta: string }>(
+    `/orders/${orderId}/weights`,
+    { method: 'POST', body: { items } }
+  );
+}
+
+export function classifyProduct(productId: string) {
+  return apiRequest<any>('/ai/classify-product', { method: 'POST', body: { productId } });
+}
+
+export function getStripeOnboardingLink(sellerId: string) {
+  return apiRequest<{ url: string }>('/sellers/stripe/onboarding-link', { method: 'POST', body: { sellerId } });
 }
