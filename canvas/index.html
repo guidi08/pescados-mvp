@@ -1,76 +1,1203 @@
 <!doctype html>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Clawdbot Canvas</title>
-<style>
-  html, body { height: 100%; margin: 0; background: #000; color: #fff; font: 16px/1.4 -apple-system, BlinkMacSystemFont, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-  .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
-  .card { width: min(720px, 100%); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 16px; padding: 18px 18px 14px; }
-  .title { display: flex; align-items: baseline; gap: 10px; }
-  h1 { margin: 0; font-size: 22px; letter-spacing: 0.2px; }
-  .sub { opacity: 0.75; font-size: 13px; }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-  button { appearance: none; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.10); color: #fff; padding: 10px 12px; border-radius: 12px; font-weight: 600; cursor: pointer; }
-  button:active { transform: translateY(1px); }
-  .ok { color: #24e08a; }
-  .bad { color: #ff5c5c; }
-  .log { margin-top: 14px; opacity: 0.85; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); padding: 10px; border-radius: 12px; }
-</style>
-<div class="wrap">
-  <div class="card">
-    <div class="title">
-      <h1>Clawdbot Canvas</h1>
-      <div class="sub">Interactive test page (auto-reload enabled)</div>
-    </div>
-
-    <div class="row">
-      <button id="btn-hello">Hello</button>
-      <button id="btn-time">Time</button>
-      <button id="btn-photo">Photo</button>
-      <button id="btn-dalek">Dalek</button>
-    </div>
-
-    <div id="status" class="sub" style="margin-top: 10px;"></div>
-    <div id="log" class="log">Ready.</div>
-  </div>
-</div>
-<script>
-(() => {
-  const logEl = document.getElementById("log");
-  const statusEl = document.getElementById("status");
-  const log = (msg) => { logEl.textContent = String(msg); };
-
-  const hasIOS = () => !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.clawdbotCanvasA2UIAction);
-  const hasAndroid = () => !!(window.clawdbotCanvasA2UIAction && typeof window.clawdbotCanvasA2UIAction.postMessage === "function");
-  const hasHelper = () => typeof window.clawdbotSendUserAction === "function";
-  statusEl.innerHTML =
-    "Bridge: " +
-    (hasHelper() ? "<span class='ok'>ready</span>" : "<span class='bad'>missing</span>") +
-    " · iOS=" + (hasIOS() ? "yes" : "no") +
-    " · Android=" + (hasAndroid() ? "yes" : "no");
-
-  window.addEventListener("clawdbot:a2ui-action-status", (ev) => {
-    const d = ev && ev.detail || {};
-    log("Action status: id=" + (d.id || "?") + " ok=" + String(!!d.ok) + (d.error ? (" error=" + d.error) : ""));
-  });
-
-  function send(name, sourceComponentId) {
-    if (!hasHelper()) {
-      log("No action bridge found. Ensure you're viewing this on an iOS/Android Clawdbot node canvas.");
-      return;
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shrek: Resgate no Pantano</title>
+  <style>
+    :root {
+      --bg-top: #123524;
+      --bg-bottom: #08140d;
+      --panel: rgba(8, 20, 13, 0.8);
+      --panel-border: rgba(213, 247, 101, 0.22);
+      --text: #f4f0cf;
+      --muted: #b7c795;
+      --accent: #d5f765;
+      --accent-2: #ffad33;
+      --danger: #ff6b57;
+      --ground: #5c3c21;
+      --sky-haze: rgba(154, 214, 90, 0.08);
+      --shadow: rgba(0, 0, 0, 0.28);
     }
-    const ok = window.clawdbotSendUserAction({
-      name,
-      surfaceId: "main",
-      sourceComponentId,
-      context: { t: Date.now() },
-    });
-    log(ok ? ("Sent action: " + name) : ("Failed to send action: " + name));
-  }
 
-  document.getElementById("btn-hello").onclick = () => send("hello", "demo.hello");
-  document.getElementById("btn-time").onclick = () => send("time", "demo.time");
-  document.getElementById("btn-photo").onclick = () => send("photo", "demo.photo");
-  document.getElementById("btn-dalek").onclick = () => send("dalek", "demo.dalek");
-})();
-</script>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(213, 247, 101, 0.14), transparent 30%),
+        linear-gradient(180deg, var(--bg-top) 0%, #0a2215 48%, var(--bg-bottom) 100%);
+      color: var(--text);
+      font-family: "Trebuchet MS", "Verdana", sans-serif;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto;
+      width: 32vw;
+      height: 32vw;
+      border-radius: 50%;
+      filter: blur(48px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.45;
+    }
+
+    body::before {
+      top: -8vw;
+      left: -12vw;
+      background: rgba(213, 247, 101, 0.15);
+      animation: floatFog 9s ease-in-out infinite;
+    }
+
+    body::after {
+      right: -10vw;
+      bottom: -10vw;
+      background: rgba(255, 173, 51, 0.11);
+      animation: floatFog 12s ease-in-out infinite reverse;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .game-card {
+      width: min(1080px, 100%);
+      background: linear-gradient(180deg, rgba(11, 30, 19, 0.84), rgba(5, 11, 7, 0.88));
+      border: 1px solid var(--panel-border);
+      border-radius: 28px;
+      box-shadow:
+        0 24px 64px rgba(0, 0, 0, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .title-block {
+      display: grid;
+      gap: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 38px);
+      line-height: 1;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 56ch;
+    }
+
+    .hud {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      min-width: 102px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(213, 247, 101, 0.18);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .pill strong {
+      display: block;
+      color: var(--text);
+      font-size: 18px;
+      letter-spacing: 0.04em;
+    }
+
+    .arena {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(213, 247, 101, 0.16);
+      background:
+        radial-gradient(circle at 10% 14%, rgba(213, 247, 101, 0.06), transparent 22%),
+        linear-gradient(180deg, rgba(185, 230, 121, 0.14), transparent 32%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 18px 38px rgba(0, 0, 0, 0.28);
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      aspect-ratio: 16 / 9;
+      background:
+        linear-gradient(180deg, rgba(136, 197, 95, 0.13), transparent 28%),
+        linear-gradient(180deg, #6ca1c8 0%, #8ec4d6 28%, #729758 60%, #24361f 100%);
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, rgba(3, 7, 4, 0.18), rgba(3, 7, 4, 0.46));
+      transition: opacity 180ms ease;
+      pointer-events: auto;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay-card {
+      width: min(92%, 560px);
+      pointer-events: auto;
+      background: linear-gradient(180deg, rgba(11, 26, 16, 0.95), rgba(5, 9, 6, 0.94));
+      border: 1px solid rgba(213, 247, 101, 0.2);
+      border-radius: 24px;
+      padding: 22px;
+      text-align: center;
+      box-shadow: 0 26px 50px rgba(0, 0, 0, 0.34);
+    }
+
+    .overlay-card h2 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .overlay-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 18px;
+      background: linear-gradient(180deg, #e7ff9d, var(--accent));
+      color: #213113;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(0, 0, 0, 0.22);
+      transition: transform 140ms ease, filter 140ms ease;
+    }
+
+    button.secondary {
+      background: linear-gradient(180deg, #ffc16d, var(--accent-2));
+      color: #3d240a;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+    }
+
+    button:active {
+      transform: translateY(1px) scale(0.99);
+    }
+
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 14px;
+      min-height: 1.4em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-hint {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 40ch;
+    }
+
+    .touch {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .touch button {
+      min-width: 68px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border: 1px solid rgba(213, 247, 101, 0.16);
+      box-shadow: none;
+    }
+
+    .touch button.jump {
+      background: linear-gradient(180deg, #f4c57c, #ff9d2f);
+      color: #3d240a;
+      font-weight: 900;
+    }
+
+    .touch button.pressed {
+      transform: translateY(1px) scale(0.98);
+      background: rgba(213, 247, 101, 0.16);
+    }
+
+    @media (max-width: 820px) {
+      .game-card {
+        padding: 14px;
+        border-radius: 22px;
+      }
+
+      .topbar,
+      .meta,
+      .controls {
+        justify-content: center;
+      }
+
+      .title-block,
+      .status,
+      .control-hint {
+        text-align: center;
+      }
+
+      .hud {
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        overflow: auto;
+      }
+
+      .shell {
+        padding: 10px;
+      }
+
+      .pill {
+        min-width: 90px;
+      }
+    }
+
+    @keyframes floatFog {
+      0%,
+      100% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      50% {
+        transform: translate3d(0, 12px, 0) scale(1.08);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="game-card">
+      <div class="topbar">
+        <div class="title-block">
+          <h1>Shrek: Resgate no Pantano</h1>
+          <div class="subtitle">Uma fase unica, curta e caotica: pegue a chave, fuja das tochas e salve Fiona antes dos 30 segundos acabarem.</div>
+        </div>
+        <div class="hud">
+          <div class="pill">Tempo<strong id="time-pill">30.0s</strong></div>
+          <div class="pill">Cebolas<strong id="onion-pill">0 / 4</strong></div>
+          <div class="pill">Missao<strong id="goal-pill">Pegue a chave</strong></div>
+        </div>
+      </div>
+
+      <div class="arena">
+        <canvas id="game" width="1280" height="720"></canvas>
+        <div id="overlay" class="overlay">
+          <div class="overlay-card">
+            <h2 id="overlay-title">Salve Fiona</h2>
+            <p id="overlay-copy">Shrek precisa cruzar o pantano, coletar 4 cebolas para ganhar impulso moral, pegar a chave do moinho e libertar Fiona em menos de 30 segundos.</p>
+            <div class="actions">
+              <button id="start-btn">Iniciar fase</button>
+              <button id="restart-btn" class="secondary">Recomecar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div id="status" class="status">Burro diz: "Vai, grandao. Fiona nao vai se salvar sozinha."</div>
+        <button id="mini-restart" class="secondary">Reiniciar corrida</button>
+      </div>
+
+      <div class="controls">
+        <div class="control-hint">Teclado: A/D ou setas para correr, W, seta para cima ou espaco para pular. No celular, use os botoes abaixo.</div>
+        <div class="touch">
+          <button data-action="left">Esq</button>
+          <button data-action="right">Dir</button>
+          <button data-action="jump" class="jump">Pular</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const overlay = document.getElementById("overlay");
+      const overlayTitle = document.getElementById("overlay-title");
+      const overlayCopy = document.getElementById("overlay-copy");
+      const startBtn = document.getElementById("start-btn");
+      const restartBtn = document.getElementById("restart-btn");
+      const miniRestartBtn = document.getElementById("mini-restart");
+      const statusEl = document.getElementById("status");
+      const timePill = document.getElementById("time-pill");
+      const onionPill = document.getElementById("onion-pill");
+      const goalPill = document.getElementById("goal-pill");
+      const touchButtons = Array.from(document.querySelectorAll("[data-action]"));
+
+      const WORLD_WIDTH = 3600;
+      const GROUND_Y = 602;
+      const PLAYER_SIZE = { w: 70, h: 96 };
+      const colors = {
+        haze: "rgba(154, 214, 90, 0.08)",
+        swamp: "#25361a",
+        mud: "#4d351f",
+        mudDark: "#352312",
+        platform: "#734622",
+        platformEdge: "#9f6b39",
+        onion: "#e9d3aa",
+        onionLeaf: "#7ab54d",
+        key: "#ffd765",
+        fionaDress: "#8b49a4",
+        fionaHair: "#a54f2a",
+        villager: "#e25a43",
+        villagerDark: "#512218",
+        torch: "#ffb44c",
+        tower: "#b5b6af",
+        towerDark: "#77786e",
+        banner: "#7d1b2e",
+      };
+
+      const state = {
+        running: false,
+        ended: false,
+        victory: false,
+        timeLeft: 30,
+        onions: 0,
+        cameraX: 0,
+        hasKey: false,
+        canDoubleJump: false,
+        jumpCount: 0,
+        keys: {
+          left: false,
+          right: false,
+          jump: false,
+        },
+        player: null,
+        onionsList: [],
+        enemies: [],
+        effects: [],
+        lastTimestamp: 0,
+      };
+
+      const level = {
+        platforms: [
+          { x: -180, y: 608, w: 1120, h: 160 },
+          { x: 1040, y: 608, w: 560, h: 160 },
+          { x: 1740, y: 608, w: 520, h: 160 },
+          { x: 2370, y: 608, w: 580, h: 160 },
+          { x: 3070, y: 608, w: 760, h: 160 },
+          { x: 560, y: 486, w: 220, h: 24 },
+          { x: 894, y: 418, w: 190, h: 24 },
+          { x: 1300, y: 452, w: 220, h: 24 },
+          { x: 1860, y: 438, w: 180, h: 24 },
+          { x: 2475, y: 494, w: 220, h: 24 },
+          { x: 2860, y: 408, w: 200, h: 24 },
+        ],
+        hazards: [
+          { x: 940, w: 100 },
+          { x: 1600, w: 140 },
+          { x: 2260, w: 110 },
+          { x: 2950, w: 120 },
+        ],
+        key: { x: 2865, y: 350, w: 42, h: 42 },
+        goal: { x: 3385, y: 432, w: 120, h: 170 },
+        swampPools: [
+          { x: 210, w: 190, y: 645 },
+          { x: 1180, w: 240, y: 648 },
+          { x: 2040, w: 160, y: 646 },
+          { x: 3220, w: 260, y: 650 },
+        ],
+        reeds: [
+          { x: 120, h: 82 },
+          { x: 362, h: 64 },
+          { x: 1225, h: 74 },
+          { x: 2060, h: 78 },
+          { x: 3250, h: 84 },
+          { x: 3450, h: 68 },
+        ],
+      };
+
+      function resetGame() {
+        state.running = false;
+        state.ended = false;
+        state.victory = false;
+        state.timeLeft = 30;
+        state.onions = 0;
+        state.cameraX = 0;
+        state.hasKey = false;
+        state.canDoubleJump = false;
+        state.jumpCount = 0;
+        state.effects = [];
+        state.lastTimestamp = 0;
+        state.player = {
+          x: 72,
+          y: 490,
+          w: PLAYER_SIZE.w,
+          h: PLAYER_SIZE.h,
+          vx: 0,
+          vy: 0,
+          speed: 420,
+          jumpPower: 930,
+          onGround: false,
+          invincible: 0,
+          face: 1,
+        };
+        state.onionsList = [
+          { x: 665, y: 440, r: 18, taken: false },
+          { x: 1450, y: 405, r: 18, taken: false },
+          { x: 1960, y: 388, r: 18, taken: false },
+          { x: 2545, y: 454, r: 18, taken: false },
+        ];
+        state.enemies = [
+          { x: 700, y: 560, w: 54, h: 54, minX: 560, maxX: 880, vx: 86, type: "villager" },
+          { x: 1505, y: 560, w: 54, h: 54, minX: 1260, maxX: 1560, vx: -92, type: "villager" },
+          { x: 1930, y: 390, w: 48, h: 48, minX: 1860, maxX: 2040, vx: 82, type: "rat" },
+          { x: 2615, y: 446, w: 54, h: 54, minX: 2482, maxX: 2680, vx: -96, type: "villager" },
+          { x: 3185, y: 560, w: 60, h: 60, minX: 3100, maxX: 3510, vx: 110, type: "villager" },
+        ];
+        setOverlay(
+          "Salve Fiona",
+          "Shrek precisa cruzar o pantano, coletar 4 cebolas para ganhar impulso moral, pegar a chave do moinho e libertar Fiona em menos de 30 segundos.",
+          true
+        );
+        updateHud();
+        setStatus('Burro diz: "Vai, grandao. Fiona nao vai se salvar sozinha."');
+      }
+
+      function startGame() {
+        if (state.ended) {
+          resetGame();
+        }
+        state.running = true;
+        state.ended = false;
+        overlay.classList.add("hidden");
+        setStatus('Corra! Os aldeoes tao chegando com tochas e opinioes fortes.');
+      }
+
+      function setOverlay(title, copy, show) {
+        overlayTitle.textContent = title;
+        overlayCopy.textContent = copy;
+        overlay.classList.toggle("hidden", !show);
+      }
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function updateHud() {
+        timePill.textContent = `${state.timeLeft.toFixed(1)}s`;
+        onionPill.textContent = `${state.onions} / 4`;
+        goalPill.textContent = state.hasKey ? "Corra pra Fiona" : "Pegue a chave";
+      }
+
+      function rectsOverlap(a, b) {
+        return (
+          a.x < b.x + b.w &&
+          a.x + a.w > b.x &&
+          a.y < b.y + b.h &&
+          a.y + a.h > b.y
+        );
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function triggerJump() {
+        if (!state.running || state.ended) {
+          return;
+        }
+        const player = state.player;
+        if (player.onGround) {
+          player.vy = -player.jumpPower;
+          player.onGround = false;
+          state.jumpCount = 1;
+        } else if (state.canDoubleJump && state.jumpCount < 2) {
+          player.vy = -player.jumpPower * 0.84;
+          state.jumpCount = 2;
+          spawnBurst(player.x + player.w / 2, player.y + player.h / 2, "#e7ff9d");
+          setStatus('Burro diz: "Cebolas energeticas! Mais um pulo, bebe!"');
+        }
+      }
+
+      function spawnBurst(x, y, color) {
+        for (let i = 0; i < 10; i += 1) {
+          state.effects.push({
+            x,
+            y,
+            vx: (Math.random() - 0.5) * 240,
+            vy: (Math.random() - 0.5) * 240,
+            life: 0.55 + Math.random() * 0.25,
+            color,
+          });
+        }
+      }
+
+      function hitPlayer() {
+        const player = state.player;
+        if (player.invincible > 0 || state.ended) {
+          return;
+        }
+        player.invincible = 1.2;
+        player.x = Math.max(42, player.x - 110);
+        player.y = 260;
+        player.vx = -220;
+        player.vy = -360;
+        state.timeLeft = Math.max(0, state.timeLeft - 3.5);
+        spawnBurst(player.x + player.w / 2, player.y + player.h / 2, "#ff8d76");
+        setStatus("O aldeao acertou Shrek. Perdeu 3.5 segundos na confusao.");
+        if (state.timeLeft <= 0) {
+          finish(false, "Shrek se enrolou no caos do pantano e o tempo acabou.");
+        }
+      }
+
+      function collectOnion(onion) {
+        if (onion.taken) {
+          return;
+        }
+        onion.taken = true;
+        state.onions += 1;
+        spawnBurst(onion.x, onion.y, "#e9d3aa");
+        if (state.onions >= 4) {
+          state.canDoubleJump = true;
+          setStatus('Burro diz: "Combo de cebola completo. Agora voce voa, ograo!"');
+        } else {
+          setStatus(`Cebola ${state.onions}/4 pega. O pantano continua fedido, mas promissor.`);
+        }
+      }
+
+      function collectKey() {
+        if (state.hasKey) {
+          return;
+        }
+        state.hasKey = true;
+        spawnBurst(level.key.x + 20, level.key.y + 20, "#ffd765");
+        setStatus("A chave do moinho e sua. Fiona esta logo ali no fim.");
+      }
+
+      function finish(victory, message) {
+        state.running = false;
+        state.ended = true;
+        state.victory = victory;
+        const title = victory ? "Fiona foi salva" : "Fim de fase";
+        const copy = victory
+          ? `Shrek chegou com ${state.timeLeft.toFixed(1)}s sobrando. Fiona topou ir embora, mas o Burro quer repetir a fase.`
+          : message;
+        setOverlay(title, copy, true);
+        setStatus(victory ? "Missao completa. O pantano venceu o castelo." : message);
+      }
+
+      function getSupportPlatforms(entity) {
+        return level.platforms.filter((platform) => {
+          const withinX = entity.x + entity.w > platform.x && entity.x < platform.x + platform.w;
+          const above = entity.y + entity.h <= platform.y + 18;
+          return withinX && above;
+        });
+      }
+
+      function updatePlayer(dt) {
+        const player = state.player;
+        const moveInput = Number(state.keys.right) - Number(state.keys.left);
+        player.vx = moveInput * player.speed;
+        if (moveInput !== 0) {
+          player.face = moveInput > 0 ? 1 : -1;
+        }
+
+        player.vy += 2180 * dt;
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
+        player.onGround = false;
+
+        const supports = getSupportPlatforms(player);
+        for (const platform of supports) {
+          const wasAbove = player.y + player.h - player.vy * dt <= platform.y;
+          const landed = player.y + player.h >= platform.y && player.y + player.h <= platform.y + 30 && wasAbove;
+          if (landed && player.vy >= 0) {
+            player.y = platform.y - player.h;
+            player.vy = 0;
+            player.onGround = true;
+            state.jumpCount = 0;
+          }
+        }
+
+        if (player.x < 0) {
+          player.x = 0;
+        }
+        if (player.x + player.w > WORLD_WIDTH) {
+          player.x = WORLD_WIDTH - player.w;
+        }
+
+        for (const hazard of level.hazards) {
+          const playerFeet = player.y + player.h;
+          const overHazard = player.x + player.w > hazard.x && player.x < hazard.x + hazard.w;
+          if (overHazard && playerFeet >= GROUND_Y + 8) {
+            hitPlayer();
+          }
+        }
+
+        if (player.y > canvas.height + 180) {
+          hitPlayer();
+        }
+
+        player.invincible = Math.max(0, player.invincible - dt);
+
+        for (const onion of state.onionsList) {
+          if (!onion.taken) {
+            const circleHitbox = { x: onion.x - onion.r, y: onion.y - onion.r, w: onion.r * 2, h: onion.r * 2 };
+            if (rectsOverlap(player, circleHitbox)) {
+              collectOnion(onion);
+            }
+          }
+        }
+
+        if (!state.hasKey && rectsOverlap(player, level.key)) {
+          collectKey();
+        }
+
+        if (state.hasKey && rectsOverlap(player, level.goal)) {
+          finish(true);
+        }
+      }
+
+      function updateEnemies(dt) {
+        for (const enemy of state.enemies) {
+          enemy.x += enemy.vx * dt;
+          if (enemy.x <= enemy.minX || enemy.x + enemy.w >= enemy.maxX) {
+            enemy.vx *= -1;
+          }
+          const entity = { x: enemy.x, y: enemy.y, w: enemy.w, h: enemy.h, vy: 0 };
+          const supports = getSupportPlatforms(entity);
+          if (supports.length > 0) {
+            enemy.y = Math.min(...supports.map((platform) => platform.y - enemy.h));
+          }
+          if (rectsOverlap(state.player, enemy)) {
+            const stomp = state.player.vy > 210 && state.player.y + state.player.h - 12 < enemy.y + 12;
+            if (stomp) {
+              state.player.vy = -state.player.jumpPower * 0.55;
+              enemy.x = enemy.minX;
+              enemy.vx *= -1;
+              spawnBurst(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, "#ffd765");
+              setStatus("Pisao certeiro. O aldeao ficou repensando as proprias escolhas.");
+            } else {
+              hitPlayer();
+            }
+          }
+        }
+      }
+
+      function updateEffects(dt) {
+        state.effects = state.effects.filter((effect) => {
+          effect.life -= dt;
+          effect.x += effect.vx * dt;
+          effect.y += effect.vy * dt;
+          effect.vy += 260 * dt;
+          return effect.life > 0;
+        });
+      }
+
+      function update(dt) {
+        if (!state.running || state.ended) {
+          updateEffects(dt);
+          return;
+        }
+
+        state.timeLeft = Math.max(0, state.timeLeft - dt);
+        if (state.timeLeft <= 0) {
+          finish(false, "O relogio bateu 30 segundos. Fiona continua esperando no castelo.");
+        }
+
+        updatePlayer(dt);
+        updateEnemies(dt);
+        updateEffects(dt);
+        state.cameraX = clamp(state.player.x - canvas.width * 0.35, 0, WORLD_WIDTH - canvas.width);
+        updateHud();
+      }
+
+      function drawBackground(cameraX) {
+        ctx.save();
+        ctx.fillStyle = "#85bbd1";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        skyGradient.addColorStop(0, "#97d4d8");
+        skyGradient.addColorStop(0.42, "#bddf96");
+        skyGradient.addColorStop(1, "#33472a");
+        ctx.fillStyle = skyGradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < 7; i += 1) {
+          const parallax = cameraX * (0.18 + i * 0.03);
+          const hillX = (i * 410) - parallax * 0.35;
+          const hillY = 310 + (i % 2) * 36;
+          ctx.fillStyle = i % 2 === 0 ? "rgba(42, 71, 36, 0.36)" : "rgba(73, 112, 55, 0.28)";
+          ctx.beginPath();
+          ctx.moveTo(hillX, canvas.height);
+          ctx.quadraticCurveTo(hillX + 150, hillY - 120, hillX + 310, canvas.height);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.fillStyle = colors.haze;
+        for (let i = 0; i < 12; i += 1) {
+          const x = ((i * 290) - cameraX * 0.2) % (canvas.width + 280);
+          const y = 70 + (i % 3) * 55;
+          ctx.beginPath();
+          ctx.ellipse(x, y, 130, 42, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      function drawSwampDecor(cameraX) {
+        for (const pool of level.swampPools) {
+          const x = pool.x - cameraX;
+          ctx.fillStyle = "#21341b";
+          ctx.beginPath();
+          ctx.ellipse(x + pool.w / 2, pool.y, pool.w / 2, 28, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(181, 216, 90, 0.15)";
+          ctx.beginPath();
+          ctx.ellipse(x + pool.w * 0.4, pool.y - 4, pool.w * 0.2, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        for (const reed of level.reeds) {
+          const x = reed.x - cameraX;
+          ctx.strokeStyle = "#436b2e";
+          ctx.lineWidth = 5;
+          for (let i = 0; i < 4; i += 1) {
+            ctx.beginPath();
+            ctx.moveTo(x + i * 8, GROUND_Y + 4);
+            ctx.quadraticCurveTo(x + i * 10 + 5, GROUND_Y - reed.h * 0.6, x + i * 6 + 12, GROUND_Y - reed.h);
+            ctx.stroke();
+          }
+        }
+      }
+
+      function drawPlatforms(cameraX) {
+        ctx.fillStyle = colors.platform;
+        ctx.strokeStyle = colors.platformEdge;
+        ctx.lineWidth = 5;
+        for (const platform of level.platforms) {
+          const x = platform.x - cameraX;
+          ctx.fillRect(x, platform.y, platform.w, platform.h);
+          ctx.strokeRect(x, platform.y, platform.w, platform.h);
+
+          ctx.fillStyle = colors.mudDark;
+          for (let i = 0; i < platform.w; i += 44) {
+            ctx.fillRect(x + i, platform.y + platform.h - 18, 20, 8);
+          }
+          ctx.fillStyle = colors.platform;
+        }
+
+        for (const hazard of level.hazards) {
+          const x = hazard.x - cameraX;
+          const gradient = ctx.createLinearGradient(x, GROUND_Y, x, GROUND_Y + 70);
+          gradient.addColorStop(0, "#2f4822");
+          gradient.addColorStop(1, "#111d0f");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x, GROUND_Y, hazard.w, 110);
+
+          ctx.fillStyle = "rgba(179, 214, 94, 0.15)";
+          for (let i = 0; i < 3; i += 1) {
+            ctx.beginPath();
+            ctx.arc(x + 20 + i * 30, GROUND_Y + 38 + Math.sin((performance.now() / 180) + i) * 6, 6 + i * 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      function drawOnion(onion, cameraX) {
+        if (onion.taken) {
+          return;
+        }
+        const x = onion.x - cameraX;
+        const bob = Math.sin(performance.now() / 160 + onion.x * 0.02) * 4;
+        ctx.save();
+        ctx.translate(x, onion.y + bob);
+        ctx.fillStyle = colors.onion;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 18, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#cfb18a";
+        ctx.beginPath();
+        ctx.ellipse(0, 7, 14, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = colors.onionLeaf;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        ctx.quadraticCurveTo(6, -30, 12, -34);
+        ctx.moveTo(0, -10);
+        ctx.quadraticCurveTo(-4, -28, -10, -34);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawKey(cameraX) {
+        if (state.hasKey) {
+          return;
+        }
+        const x = level.key.x - cameraX;
+        const y = level.key.y + Math.sin(performance.now() / 220) * 6;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = colors.key;
+        ctx.beginPath();
+        ctx.arc(10, 10, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#8b6921";
+        ctx.beginPath();
+        ctx.arc(10, 10, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = colors.key;
+        ctx.fillRect(20, 6, 34, 8);
+        ctx.fillRect(40, 14, 8, 10);
+        ctx.fillRect(48, 14, 8, 14);
+        ctx.restore();
+      }
+
+      function drawEnemy(enemy, cameraX) {
+        const x = enemy.x - cameraX;
+        const y = enemy.y;
+        ctx.save();
+        if (enemy.type === "rat") {
+          ctx.fillStyle = "#6d6c73";
+          ctx.beginPath();
+          ctx.ellipse(x + enemy.w / 2, y + enemy.h / 2, enemy.w / 2, enemy.h / 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#d2c2b7";
+          ctx.beginPath();
+          ctx.arc(x + enemy.w * 0.24, y + enemy.h * 0.3, 7, 0, Math.PI * 2);
+          ctx.arc(x + enemy.w * 0.74, y + enemy.h * 0.3, 7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#cab6a2";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(x + enemy.w - 4, y + enemy.h * 0.48);
+          ctx.quadraticCurveTo(x + enemy.w + 18, y + enemy.h * 0.2, x + enemy.w + 26, y + enemy.h * 0.5);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = colors.villager;
+          ctx.fillRect(x + 10, y + 16, enemy.w - 20, enemy.h - 16);
+          ctx.fillStyle = "#ffd5b5";
+          ctx.fillRect(x + 14, y, enemy.w - 28, 24);
+          ctx.fillStyle = colors.villagerDark;
+          ctx.fillRect(x + 18, y + 30, 10, 24);
+          ctx.fillRect(x + enemy.w - 28, y + 30, 10, 24);
+          ctx.fillStyle = "#f6e48d";
+          const torchX = enemy.vx > 0 ? x + enemy.w - 10 : x + 10;
+          ctx.fillRect(torchX, y + 18, 6, 28);
+          ctx.fillStyle = colors.torch;
+          ctx.beginPath();
+          ctx.arc(torchX + 3, y + 14, 11, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawPlayer(cameraX) {
+        const player = state.player;
+        const x = player.x - cameraX;
+        const y = player.y;
+        const blink = player.invincible > 0 && Math.floor(player.invincible * 18) % 2 === 0;
+        if (blink) {
+          return;
+        }
+
+        ctx.save();
+        ctx.translate(x + player.w / 2, y + player.h / 2);
+        ctx.scale(player.face, 1);
+        ctx.translate(-player.w / 2, -player.h / 2);
+
+        ctx.fillStyle = "#5e8f2f";
+        ctx.fillRect(6, 16, player.w - 12, player.h - 18);
+        ctx.fillStyle = "#89bf43";
+        ctx.fillRect(16, 0, player.w - 32, 32);
+        ctx.fillStyle = "#3c5f1f";
+        ctx.fillRect(10, 34, 18, 32);
+        ctx.fillRect(player.w - 28, 34, 18, 32);
+        ctx.fillStyle = "#704b30";
+        ctx.fillRect(12, player.h - 18, 18, 18);
+        ctx.fillRect(player.w - 30, player.h - 18, 18, 18);
+        ctx.fillStyle = "#2f4321";
+        ctx.fillRect(28, 30, 14, 48);
+
+        ctx.fillStyle = "#a0df5f";
+        ctx.fillRect(0, 10, player.w, 20);
+        ctx.fillStyle = "#6d3d1d";
+        ctx.beginPath();
+        ctx.arc(player.w / 2, 12, 16, Math.PI, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(18, 14, 10, 10);
+        ctx.fillRect(player.w - 28, 14, 10, 10);
+        ctx.fillStyle = "#221f1f";
+        ctx.fillRect(22, 18, 4, 4);
+        ctx.fillRect(player.w - 24, 18, 4, 4);
+        ctx.fillStyle = "#2c1e14";
+        ctx.fillRect(18, 26, player.w - 36, 5);
+        ctx.fillRect(10, 8, 14, 7);
+        ctx.fillRect(player.w - 24, 8, 14, 7);
+
+        ctx.restore();
+      }
+
+      function drawGoal(cameraX) {
+        const x = level.goal.x - cameraX;
+        const y = level.goal.y;
+        ctx.save();
+        ctx.fillStyle = colors.tower;
+        ctx.fillRect(x + 28, y - 66, 72, 236);
+        ctx.fillStyle = colors.towerDark;
+        ctx.fillRect(x + 48, y + 48, 32, 122);
+        ctx.fillStyle = colors.banner;
+        ctx.fillRect(x + 16, y - 42, 26, 84);
+        ctx.fillRect(x + 96, y - 20, 20, 72);
+        ctx.fillStyle = "#403229";
+        ctx.fillRect(x + 52, y + 82, 24, 88);
+
+        ctx.fillStyle = "#f0b0ad";
+        ctx.fillRect(x - 4, y + 38, 44, 64);
+        ctx.fillStyle = colors.fionaDress;
+        ctx.fillRect(x - 12, y + 88, 60, 90);
+        ctx.fillStyle = colors.fionaHair;
+        ctx.beginPath();
+        ctx.arc(x + 18, y + 34, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#7cb144";
+        ctx.beginPath();
+        ctx.arc(x + 18, y + 44, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (!state.hasKey) {
+          ctx.strokeStyle = "#e0dfc2";
+          ctx.lineWidth = 5;
+          for (let i = 0; i < 4; i += 1) {
+            ctx.beginPath();
+            ctx.moveTo(x + i * 12 - 12, y + 32);
+            ctx.lineTo(x + i * 12 - 12, y + 165);
+            ctx.stroke();
+          }
+        } else {
+          ctx.fillStyle = "rgba(213, 247, 101, 0.18)";
+          ctx.fillRect(x - 20, y + 18, 70, 160);
+        }
+
+        ctx.restore();
+      }
+
+      function drawEffects(cameraX) {
+        for (const effect of state.effects) {
+          ctx.globalAlpha = Math.max(0, effect.life * 1.4);
+          ctx.fillStyle = effect.color;
+          ctx.beginPath();
+          ctx.arc(effect.x - cameraX, effect.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function drawProgressBar() {
+        const progress = clamp((state.player.x + state.player.w) / WORLD_WIDTH, 0, 1);
+        const barX = 26;
+        const barY = 22;
+        const barW = 240;
+        const barH = 16;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.fillRect(barX + 2, barY + 2, barW - 4, barH - 4);
+        ctx.fillStyle = "#d5f765";
+        ctx.fillRect(barX + 2, barY + 2, (barW - 4) * progress, barH - 4);
+
+        ctx.fillStyle = "#f4f0cf";
+        ctx.font = "700 13px Trebuchet MS";
+        ctx.fillText("PANTANO", barX, barY - 8);
+        ctx.fillText("FIONA", barX + barW - 38, barY - 8);
+      }
+
+      function drawScene() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground(state.cameraX);
+        drawSwampDecor(state.cameraX);
+        drawPlatforms(state.cameraX);
+
+        for (const onion of state.onionsList) {
+          drawOnion(onion, state.cameraX);
+        }
+
+        drawKey(state.cameraX);
+        for (const enemy of state.enemies) {
+          drawEnemy(enemy, state.cameraX);
+        }
+        drawGoal(state.cameraX);
+        drawPlayer(state.cameraX);
+        drawEffects(state.cameraX);
+        drawProgressBar();
+      }
+
+      function loop(timestamp) {
+        if (!state.lastTimestamp) {
+          state.lastTimestamp = timestamp;
+        }
+        const dt = Math.min((timestamp - state.lastTimestamp) / 1000, 0.033);
+        state.lastTimestamp = timestamp;
+        update(dt);
+        drawScene();
+        requestAnimationFrame(loop);
+      }
+
+      function setKeyFromEvent(event, pressed) {
+        const key = event.key.toLowerCase();
+        if (key === "arrowleft" || key === "a") {
+          state.keys.left = pressed;
+        }
+        if (key === "arrowright" || key === "d") {
+          state.keys.right = pressed;
+        }
+        if (key === "arrowup" || key === "w" || key === " ") {
+          if (pressed && !state.keys.jump) {
+            triggerJump();
+          }
+          state.keys.jump = pressed;
+        }
+      }
+
+      window.addEventListener("keydown", (event) => {
+        const keysToHandle = ["arrowleft", "arrowright", "arrowup", "a", "d", "w", " "];
+        if (keysToHandle.includes(event.key.toLowerCase())) {
+          event.preventDefault();
+        }
+        if (!state.running && !state.ended && (event.key === "Enter" || event.key === " ")) {
+          startGame();
+        }
+        setKeyFromEvent(event, true);
+      });
+
+      window.addEventListener("keyup", (event) => {
+        setKeyFromEvent(event, false);
+      });
+
+      function applyTouchState(action, pressed) {
+        if (action === "left") {
+          state.keys.left = pressed;
+        }
+        if (action === "right") {
+          state.keys.right = pressed;
+        }
+        if (action === "jump") {
+          if (pressed) {
+            triggerJump();
+          }
+          state.keys.jump = pressed;
+        }
+      }
+
+      for (const button of touchButtons) {
+        const action = button.dataset.action;
+        const press = (event) => {
+          event.preventDefault();
+          button.classList.add("pressed");
+          applyTouchState(action, true);
+        };
+        const release = (event) => {
+          event.preventDefault();
+          button.classList.remove("pressed");
+          applyTouchState(action, false);
+        };
+        button.addEventListener("pointerdown", press);
+        button.addEventListener("pointerup", release);
+        button.addEventListener("pointerleave", release);
+        button.addEventListener("pointercancel", release);
+      }
+
+      startBtn.addEventListener("click", startGame);
+      restartBtn.addEventListener("click", () => {
+        resetGame();
+        startGame();
+      });
+      miniRestartBtn.addEventListener("click", () => {
+        resetGame();
+        startGame();
+      });
+
+      resetGame();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

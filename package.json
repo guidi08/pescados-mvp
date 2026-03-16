@@ -9,5 +9,9 @@
     "dev:admin": "npm --workspace apps/admin run dev",
     "dev:mobile": "npm --workspace apps/mobile run start",
     "lint": "echo \"(opcional)\""
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.6",
+    "invariant": "^2.2.4"
   }
 }

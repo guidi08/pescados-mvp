@@ -291,10 +291,6 @@ app.post('/orders', requireAuth, async (req: AuthedRequest, res) => {
 
   const buyerChannel: 'b2b' | 'b2c' = buyerProfile?.cnpj ? 'b2b' : 'b2c';
 
-  if (buyerChannel === 'b2c' && !deliveryAddress) {
-    return res.status(400).json({ error: 'missing_delivery_address' });
-  }
-
   // B2B: block new orders if buyer has negative wallet balance (peso variável pendente).
   if (buyerChannel === 'b2b') {
     await ensureBuyerWallet(buyerId);
@@ -326,6 +322,11 @@ app.post('/orders', requireAuth, async (req: AuthedRequest, res) => {
 
   if (buyerChannel === 'b2c' && !seller.b2c_enabled) {
     return res.status(400).json({ error: 'seller_not_enabled_for_b2c' });
+  }
+
+  // B2C: require delivery address
+  if (buyerChannel === 'b2c' && !deliveryAddress) {
+    return res.status(400).json({ error: 'missing_delivery_address' });
   }
 
   // Fetch products and variants
@@ -525,7 +526,6 @@ app.post('/payments/stripe/payment-sheet', requireAuth, async (req: AuthedReques
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
 
   const seller = await getSellerForOrder(order.seller_id);
-  if (!seller?.stripe_account_id) return res.status(400).json({ error: 'seller_not_ready_for_payouts' });
 
   const customerId = await ensureStripeCustomer(buyerId, req.user!.email ?? undefined);
 
@@ -533,6 +533,17 @@ app.post('/payments/stripe/payment-sheet', requireAuth, async (req: AuthedReques
     { customer: customerId },
     { apiVersion: '2024-06-20' }
   );
+
+  // If seller has Stripe Connect account, use split payments.
+  // Otherwise, receive 100% in platform account (manual payout to seller later).
+  const connectParams: any = {};
+  if (seller?.stripe_account_id) {
+    connectParams.application_fee_amount = order.platform_fee_cents;
+    connectParams.transfer_data = {
+      destination: seller.stripe_account_id,
+      amount: order.seller_payout_cents,
+    };
+  }
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount: order.total_cents,
@@ -549,11 +560,7 @@ app.post('/payments/stripe/payment-sheet', requireAuth, async (req: AuthedReques
       seller_payout_cents: String(order.seller_payout_cents),
     },
     description: `Pedido ${order.id} - LotePro`,
-    application_fee_amount: order.platform_fee_cents,
-    transfer_data: {
-      destination: seller.stripe_account_id,
-      amount: order.seller_payout_cents,
-    },
+    ...connectParams,
   });
 
   await supabaseService
@@ -586,7 +593,16 @@ app.post('/payments/stripe/pix', requireAuth, async (req: AuthedRequest, res) =>
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
 
   const seller = await getSellerForOrder(order.seller_id);
-  if (!seller?.stripe_account_id) return res.status(400).json({ error: 'seller_not_ready_for_payouts' });
+
+  // If seller has Stripe Connect, use split. Otherwise platform receives 100%.
+  const connectParams: any = {};
+  if (seller?.stripe_account_id) {
+    connectParams.application_fee_amount = order.platform_fee_cents;
+    connectParams.transfer_data = {
+      destination: seller.stripe_account_id,
+      amount: order.seller_payout_cents,
+    };
+  }
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount: order.total_cents,
@@ -608,11 +624,7 @@ app.post('/payments/stripe/pix', requireAuth, async (req: AuthedRequest, res) =>
         expires_after_seconds: 3600,
       },
     } as any,
-    application_fee_amount: order.platform_fee_cents,
-    transfer_data: {
-      destination: seller.stripe_account_id,
-      amount: order.seller_payout_cents,
-    },
+    ...connectParams,
   });
 
   await supabaseService
