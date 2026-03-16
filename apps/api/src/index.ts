@@ -1336,7 +1336,8 @@ async function markOrderPaidAndNotify(orderId: string, paymentIntent: any): Prom
     unitPrice: formatBRL(i.unit_price_cents_snapshot),
   }));
 
-  await sendOrderEmail({
+  // Fire and forget — don't block on SMTP
+  sendOrderEmail({
     to: seller.order_email,
     sellerName: seller.display_name,
     orderId: order.id,
@@ -1348,7 +1349,7 @@ async function markOrderPaidAndNotify(orderId: string, paymentIntent: any): Prom
     deliveryAddress: order.delivery_address,
     total: formatBRL(order.total_cents),
     items: emailItems,
-  });
+  }).catch((err) => console.error('[EMAIL] Failed to send order email:', err.message));
 }
 
 app.listen(Number(env.PORT), () => {
