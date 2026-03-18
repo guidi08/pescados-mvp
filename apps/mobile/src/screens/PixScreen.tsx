@@ -4,6 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { supabase } from '../supabaseClient';
+import { useCart } from '../context/CartContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -13,6 +14,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Pix'>;
 
 export default function PixScreen({ route, navigation }: Props) {
   const { orderId, pix, total } = route.params;
+  const { clear } = useCart();
   const [copied, setCopied] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
@@ -39,6 +41,7 @@ export default function PixScreen({ route, navigation }: Props) {
           const newStatus = payload.new?.payment_status;
           if (newStatus === 'succeeded' || payload.new?.status === 'paid') {
             setPaymentConfirmed(true);
+            clear(); // Clear cart now that payment is confirmed
             Alert.alert(
               'Pagamento confirmado! ✅',
               'Seu pagamento via Pix foi recebido. O fornecedor já foi notificado.',

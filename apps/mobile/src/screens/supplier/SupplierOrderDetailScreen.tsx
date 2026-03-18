@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../supabaseClient';
 import { updateOrderWeights, confirmManualPayment } from '../../api';
@@ -7,6 +7,7 @@ import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import Input from '../../components/Input';
+import { useSeller } from '../../context/SellerContext';
 import { colors, spacing, textStyle } from '../../theme';
 import { centsToBRL } from '../../utils';
 
@@ -27,6 +28,7 @@ export default function SupplierOrderDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const orderId = route.params?.orderId;
+  const { sellerId } = useSeller();
 
   const [order, setOrder] = useState<any>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -35,7 +37,9 @@ export default function SupplierOrderDetailScreen() {
   const [confirming, setConfirming] = useState(false);
 
   const load = useCallback(async () => {
-    const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    const query = supabase.from('orders').select('*').eq('id', orderId);
+    if (sellerId) query.eq('seller_id', sellerId);
+    const { data: o } = await query.single();
     setOrder(o);
     const { data: its } = await supabase.from('order_items').select('*').eq('order_id', orderId);
     setItems(its ?? []);
@@ -106,7 +110,11 @@ export default function SupplierOrderDetailScreen() {
 
   const isAwaitingPixConfirmation = order?.payment_method === 'pix' && order?.status === 'pending_payment';
 
-  if (!order) return null;
+  if (!order) return (
+    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background.app }}>
+      <ActivityIndicator size="large" color={colors.brand.primary} />
+    </SafeAreaView>
+  );
 
   const formatDate = (iso: string) => {
     try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return iso; }

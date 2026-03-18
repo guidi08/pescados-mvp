@@ -100,11 +100,11 @@ export default function ProductScreen({ route, navigation }: Props) {
 
   function onAddToCart() {
     if (!product) return;
-    if (!product.active) { Alert.alert('Indisponivel', 'Este produto esta pausado.'); return; }
+    if (!product.active) { Alert.alert('Indispon\u00edvel', 'Este produto est\u00e1 pausado.'); return; }
 
     const q = parseQuantity();
-    if (!Number.isFinite(q) || q <= 0) { Alert.alert('Quantidade invalida', 'Informe uma quantidade valida maior que zero.'); return; }
-    if (pricingMode === 'per_kg_box' && !Number.isInteger(q)) { Alert.alert('Quantidade invalida', 'Para produtos por caixa, a quantidade deve ser um numero inteiro.'); return; }
+    if (!Number.isFinite(q) || q <= 0) { Alert.alert('Quantidade inv\u00e1lida', 'Informe uma quantidade v\u00e1lida maior que zero.'); return; }
+    if (pricingMode === 'per_kg_box' && !Number.isInteger(q)) { Alert.alert('Quantidade inv\u00e1lida', 'Para produtos por caixa, a quantidade deve ser um n\u00famero inteiro.'); return; }
 
     const sellerName = (product as any).sellers?.display_name ?? 'Fornecedor';
     const item = {
@@ -124,7 +124,7 @@ export default function ProductScreen({ route, navigation }: Props) {
     if (currentCartSellerId && currentCartSellerId !== product.seller_id && cartItems.length > 0) {
       Alert.alert(
         'Trocar fornecedor?',
-        `Seu carrinho tem itens de "${currentCartSellerName}". Ao adicionar este item, o carrinho anterior sera substituido.`,
+        `Seu carrinho tem itens de "${currentCartSellerName}". Ao adicionar este item, o carrinho anterior ser\u00e1 substitu\u00eddo.`,
         [
           { text: 'Cancelar', style: 'cancel' },
           { text: 'Trocar e adicionar', onPress: () => { addItem(product.seller_id, sellerName, item); Alert.alert('Adicionado', 'Item adicionado ao carrinho.'); } },
@@ -169,18 +169,18 @@ export default function ProductScreen({ route, navigation }: Props) {
 
         <View style={{ flexDirection: 'row', gap: spacing['2'], flexWrap: 'wrap' }}>
           <Badge label={product.fresh ? 'Fresco' : 'Congelado'} variant={product.fresh ? 'fresh' : 'frozen'} />
-          {pricingMode === 'per_kg_box' ? <Badge label="Peso variavel" variant="variable" /> : null}
+          {pricingMode === 'per_kg_box' ? <Badge label="Peso vari\u00e1vel" variant="variable" /> : null}
           {product.tags?.length ? <Badge label={product.tags.join(' - ')} variant="variable" /> : null}
         </View>
 
-        {minExpiry ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Validade minima: {minExpiry}</Text> : null}
+        {minExpiry ? <Text style={[textStyle('small'), { color: colors.text.secondary }]}>Validade m\u00ednima: {minExpiry}</Text> : null}
         {product.description ? <Text style={[textStyle('body'), { color: colors.text.primary }]}>{product.description}</Text> : null}
 
         {pricingMode === 'per_kg_box' ? (
           <Card>
-            <Text style={textStyle('h3')}>Produto por caixa (peso variavel)</Text>
-            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>Preco e por kg. Voce compra por caixa.</Text>
-            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>Peso estimado: {estimatedBoxWeightKg ?? '—'} kg/caixa{maxVarPct ? ` - variacao max.: ${maxVarPct}%` : ''}</Text>
+            <Text style={textStyle('h3')}>Produto por caixa (peso vari\u00e1vel)</Text>
+            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>Pre\u00e7o \u00e9 por kg. Voc\u00ea compra por caixa.</Text>
+            <Text style={[textStyle('small'), { color: colors.text.secondary, marginTop: spacing['2'] }]}>Peso estimado: {estimatedBoxWeightKg ?? '\u2014'} kg/caixa{maxVarPct ? ` - varia\u00e7\u00e3o m\u00e1x.: ${maxVarPct}%` : ''}</Text>
             <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: spacing['2'] }]}>O valor final pode variar. Em B2B, o ajuste pode gerar credito/debito no saldo do cliente.</Text>
           </Card>
         ) : null}

@@ -92,12 +92,15 @@ export default function LoginScreen({ navigation, route }: Props) {
           // Check if user has seller_id
           const userId = authData.session?.user?.id;
           if (userId) {
-            const { data: prof } = await supabase.from('profiles').select('seller_id').eq('id', userId).single();
-            if (prof?.seller_id) {
+            const { data: prof, error: profError } = await supabase.from('profiles').select('seller_id').eq('id', userId).single();
+            if (profError) {
+              await supabase.auth.signOut();
+              Alert.alert('Erro de conex\u00e3o', 'Erro de conex\u00e3o. Tente novamente.');
+            } else if (prof?.seller_id) {
               navigation.reset({ index: 0, routes: [{ name: 'SupplierTabs' }] });
             } else {
               await supabase.auth.signOut();
-              Alert.alert('Acesso negado', 'Esta conta não está vinculada a um fornecedor. Solicite cadastro.');
+              Alert.alert('Acesso negado', 'Esta conta n\u00e3o est\u00e1 vinculada a um fornecedor. Solicite cadastro.');
             }
           }
           return;

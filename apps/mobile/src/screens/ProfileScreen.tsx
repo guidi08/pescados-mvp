@@ -86,7 +86,27 @@ export default function ProfileScreen() {
     return doc ? `Cliente ${String(doc).slice(-4)}` : 'Minha conta';
   }, [profile]);
 
-  const docLabel = profile?.cnpj ? `CNPJ: ${profile.cnpj}` : profile?.cpf ? `CPF: ${profile.cpf}` : null;
+  function formatCPFDisplay(cpf: string): string {
+    const digits = cpf.replace(/\D/g, '').slice(0, 11);
+    if (digits.length === 11) {
+      return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+    }
+    return cpf;
+  }
+
+  function formatCNPJDisplay(cnpj: string): string {
+    const digits = cnpj.replace(/\D/g, '').slice(0, 14);
+    if (digits.length === 14) {
+      return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+    }
+    return cnpj;
+  }
+
+  const docLabel = profile?.cnpj
+    ? `CNPJ: ${formatCNPJDisplay(profile.cnpj)}`
+    : profile?.cpf
+      ? `CPF: ${formatCPFDisplay(profile.cpf)}`
+      : null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>

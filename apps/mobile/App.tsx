@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef, useState } from 'react';
-import { NativeModules, Platform, UIManager } from 'react-native';
+import { ActivityIndicator, NativeModules, Platform, UIManager, View } from 'react-native';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -49,6 +49,7 @@ import { BuyerProvider } from './src/context/BuyerContext';
 import { SellerProvider } from './src/context/SellerContext';
 import CartBar from './src/components/CartBar';
 import { colors } from './src/theme';
+import { supabase } from './src/supabaseClient';
 
 // Enable LayoutAnimation on Android (micro-transitions for cart, lists, etc.)
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -181,6 +182,8 @@ export default function App() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
   const [navReady, setNavReady] = useState(false);
   const [currentRoute, setCurrentRoute] = useState<string | null>(null);
+  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   // Deep linking for Supabase auth callback
   const linking = {
@@ -192,15 +195,49 @@ export default function App() {
     },
   };
 
-  // Optional: keep last known route for CartBar hide logic (handled by getCurrentRoute)
+  // Check for existing session on app startup
   useEffect(() => {
-    // noop
+    async function checkSession() {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user) {
+          const userId = data.session.user.id;
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('seller_id')
+            .eq('id', userId)
+            .single();
+          if (prof?.seller_id) {
+            setInitialRoute('SupplierTabs');
+          } else {
+            setInitialRoute('MainTabs');
+          }
+        } else {
+          setInitialRoute('Entry');
+        }
+      } catch {
+        setInitialRoute('Entry');
+      } finally {
+        setIsReady(true);
+      }
+    }
+    checkSession();
   }, []);
 
   const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
   // Check if current route is a supplier route (hide CartBar)
   const isSupplierRoute = currentRoute ? SUPPLIER_ROUTES.has(currentRoute) : false;
+
+  if (!isReady || !initialRoute) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background.app }}>
+          <ActivityIndicator size="large" color={colors.brand.primary} />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -225,6 +262,7 @@ export default function App() {
             }}
           >
           <Stack.Navigator
+            initialRouteName={initialRoute}
             screenOptions={{
               headerShown: false,
               animation: 'slide_from_right',

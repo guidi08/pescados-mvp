@@ -10,8 +10,26 @@ import { formatBRL } from './utils';
 import { sendOrderEmail } from './email';
 import { classifyProductWithOpenAI, fallbackClassification } from './ai';
 import { generatePixCode } from './pix';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
+
+// Rate limiting
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too_many_requests' },
+});
+
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too_many_requests' },
+});
 
 /**
  * Stripe webhook needs raw body.
@@ -83,8 +101,31 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
 });
 
 // JSON for the rest
-app.use(cors());
+const allowedOrigins = [
+  env.ADMIN_BASE_URL,                    // Vercel admin panel
+  env.APP_BASE_URL,                      // Mobile / web app
+  'http://localhost:3000',               // Local admin dev
+  'http://localhost:19006',              // Local Expo dev
+  'http://localhost:8081',               // Local Metro dev
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '1mb' }));
+app.use(generalLimiter);
+
+// Stricter rate limit for payment endpoints
+app.use('/payments', paymentLimiter);
+app.use('/wallet/topup', paymentLimiter);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -454,50 +495,64 @@ app.post('/orders', requireAuth, async (req: AuthedRequest, res) => {
   // Delivery date based on cutoff + delivery days
   const computedDeliveryDate = deliveryDate ?? computeDeliveryDate(seller.cutoff_time, seller.timezone, seller.delivery_days ?? null);
 
-  // Insert order
-  const { data: order, error: orderErr } = await supabaseService
-    .from('orders')
-    .insert({
-      buyer_id: buyerId,
-      seller_id: sellerId,
-      buyer_channel: buyerChannel,
+  // Insert order + items in a try-catch to ensure cleanup on failure
+  let order: any;
+  try {
+    const { data: orderData, error: orderErr } = await supabaseService
+      .from('orders')
+      .insert({
+        buyer_id: buyerId,
+        seller_id: sellerId,
+        buyer_channel: buyerChannel,
 
-      subtotal_cents: subtotalCents,
-      shipping_cents: shippingCents,
-      total_cents: totalCents,
-      currency: 'brl',
+        subtotal_cents: subtotalCents,
+        shipping_cents: shippingCents,
+        total_cents: totalCents,
+        currency: 'brl',
 
-      platform_commission_cents: platformCommissionCents,
-      platform_processing_cents: platformProcessingCents,
-      platform_fee_cents: platformFeeCents,
-      risk_reserve_cents: riskReserveCents,
-      seller_payout_cents: sellerPayoutCents,
+        platform_commission_cents: platformCommissionCents,
+        platform_processing_cents: platformProcessingCents,
+        platform_fee_cents: platformFeeCents,
+        risk_reserve_cents: riskReserveCents,
+        seller_payout_cents: sellerPayoutCents,
 
-      contains_fresh: containsFresh,
+        contains_fresh: containsFresh,
 
-      delivery_date: computedDeliveryDate,
-      delivery_notes: deliveryNotes ?? null,
-      delivery_address: deliveryAddress ?? null,
+        delivery_date: computedDeliveryDate,
+        delivery_notes: deliveryNotes ?? null,
+        delivery_address: deliveryAddress ?? null,
 
-      status: 'pending_payment',
-      payment_status: 'unpaid',
-    })
-    .select('*')
-    .single();
+        status: 'pending_payment',
+        payment_status: 'unpaid',
+      })
+      .select('*')
+      .single();
 
-  if (orderErr || !order) {
-    console.error(orderErr);
+    if (orderErr || !orderData) {
+      console.error(orderErr);
+      return res.status(500).json({ error: 'order_create_failed' });
+    }
+
+    order = orderData;
+
+    // Insert order items
+    const itemsWithOrder = orderItemsToInsert.map(i => ({ ...i, order_id: order.id }));
+    const { error: oiErr } = await supabaseService.from('order_items').insert(itemsWithOrder);
+    if (oiErr) {
+      throw oiErr;
+    }
+  } catch (err) {
+    console.error('Order creation failed, rolling back:', err);
+    if (order?.id) {
+      // Clean up items first (in case partial insert), then the order
+      try {
+        await supabaseService.from('order_items').delete().eq('order_id', order.id);
+        await supabaseService.from('orders').delete().eq('id', order.id);
+      } catch (rollbackErr) {
+        console.error('Rollback failed:', rollbackErr);
+      }
+    }
     return res.status(500).json({ error: 'order_create_failed' });
-  }
-
-  // Insert order items
-  const itemsWithOrder = orderItemsToInsert.map(i => ({ ...i, order_id: order.id }));
-  const { error: oiErr } = await supabaseService.from('order_items').insert(itemsWithOrder);
-  if (oiErr) {
-    console.error(oiErr);
-    // best-effort rollback
-    await supabaseService.from('orders').delete().eq('id', order.id);
-    return res.status(500).json({ error: 'order_items_create_failed' });
   }
 
   return res.json({
@@ -525,6 +580,7 @@ app.post('/payments/stripe/payment-sheet', requireAuth, async (req: AuthedReques
   const order = await getOrderForBuyer(orderId, buyerId);
   if (!order) return res.status(404).json({ error: 'order_not_found' });
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
+  if (order.payment_status !== 'unpaid') return res.status(400).json({ error: 'payment_already_initiated' });
 
   const seller = await getSellerForOrder(order.seller_id);
 
@@ -592,6 +648,7 @@ app.post('/payments/stripe/pix', requireAuth, async (req: AuthedRequest, res) =>
   const order = await getOrderForBuyer(orderId, buyerId);
   if (!order) return res.status(404).json({ error: 'order_not_found' });
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
+  if (order.payment_status !== 'unpaid') return res.status(400).json({ error: 'payment_already_initiated' });
 
   const seller = await getSellerForOrder(order.seller_id);
 
@@ -671,6 +728,7 @@ app.post('/payments/pix-manual', requireAuth, async (req: AuthedRequest, res) =>
   const order = await getOrderForBuyer(orderId, buyerId);
   if (!order) return res.status(404).json({ error: 'order_not_found' });
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
+  if (order.payment_status !== 'unpaid') return res.status(400).json({ error: 'payment_already_initiated' });
 
   // Platform PIX key — configured via env or hardcoded for now
   const platformPixKey = env.PLATFORM_PIX_KEY ?? '';
@@ -726,11 +784,13 @@ app.post('/admin/orders/:orderId/confirm-payment', requireAuth, async (req: Auth
   // Check that user has a seller_id (is an admin/seller)
   const { data: profile } = await supabaseService
     .from('profiles')
-    .select('seller_id')
+    .select('role, seller_id')
     .eq('id', req.user!.id)
     .single();
 
-  if (!profile?.seller_id) {
+  const isAdmin = profile?.role === 'admin';
+
+  if (!isAdmin && !profile?.seller_id) {
     return res.status(403).json({ error: 'not_authorized' });
   }
 
@@ -741,6 +801,12 @@ app.post('/admin/orders/:orderId/confirm-payment', requireAuth, async (req: Auth
     .single();
 
   if (!order) return res.status(404).json({ error: 'order_not_found' });
+
+  // Ensure the seller can only confirm their own orders
+  if (!isAdmin && profile?.seller_id !== order.seller_id) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+
   if (order.status === 'paid') return res.json({ ok: true, message: 'already_paid' });
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'order_not_payable' });
 
@@ -1073,10 +1139,22 @@ app.post('/orders/:orderId/weights', requireAuth, async (req: AuthedRequest, res
     metadata: { delta_cents: totalDeltaCents },
   });
 
-  // update wallet balance
-  const { data: wallet } = await supabaseService.from('buyer_wallets').select('*').eq('buyer_id', order.buyer_id).single();
-  const newBalance = Number(wallet?.balance_cents ?? 0) + walletAmountCents;
-  await supabaseService.from('buyer_wallets').update({ balance_cents: newBalance }).eq('buyer_id', order.buyer_id);
+  // update wallet balance atomically using SQL increment to avoid race conditions
+  const { data: updatedWallet, error: walletErr } = await supabaseService.rpc('increment_wallet_balance', {
+    p_buyer_id: order.buyer_id,
+    p_delta: walletAmountCents,
+  });
+
+  // Fallback: if RPC doesn't exist, use raw update with arithmetic
+  let newBalance: number;
+  if (walletErr) {
+    console.warn('RPC increment_wallet_balance not available, using fallback:', walletErr.message);
+    const { data: wallet } = await supabaseService.from('buyer_wallets').select('balance_cents').eq('buyer_id', order.buyer_id).single();
+    newBalance = Number(wallet?.balance_cents ?? 0) + walletAmountCents;
+    await supabaseService.from('buyer_wallets').update({ balance_cents: newBalance }).eq('buyer_id', order.buyer_id);
+  } else {
+    newBalance = Number(updatedWallet ?? 0);
+  }
 
   return res.json({
     ok: true,
@@ -1176,8 +1254,10 @@ function computeDeliveryDate(cutoffTime: string, timezone: string, deliveryDays:
 
   let delivery = now.plus({ days: baseDays }).startOf('day');
 
+  // delivery_days stores 0=Sun..6=Sat (JS convention), but Luxon weekday returns 1=Mon..7=Sun (ISO).
+  // Convert Luxon weekday to JS convention for the check: jsDay = weekday % 7 (7->0 for Sunday).
   const allowed = new Set((deliveryDays && deliveryDays.length ? deliveryDays : [1, 2, 3, 4, 5]));
-  while (!allowed.has(delivery.weekday)) {
+  while (!allowed.has(delivery.weekday % 7)) {
     delivery = delivery.plus({ days: 1 });
   }
 
@@ -1259,9 +1339,19 @@ async function applyWalletTopup(buyerId: string, paymentIntent: any): Promise<vo
     metadata: { payment_intent_id: piId },
   });
 
-  const { data: wallet } = await supabaseService.from('buyer_wallets').select('*').eq('buyer_id', buyerId).single();
-  const newBalance = Number(wallet?.balance_cents ?? 0) + amountCents;
-  await supabaseService.from('buyer_wallets').update({ balance_cents: newBalance }).eq('buyer_id', buyerId);
+  // Atomically increment wallet balance to avoid race conditions
+  const { error: rpcErr } = await supabaseService.rpc('increment_wallet_balance', {
+    p_buyer_id: buyerId,
+    p_delta: amountCents,
+  });
+
+  // Fallback if RPC not available
+  if (rpcErr) {
+    console.warn('RPC increment_wallet_balance not available, using fallback:', rpcErr.message);
+    const { data: wallet } = await supabaseService.from('buyer_wallets').select('balance_cents').eq('buyer_id', buyerId).single();
+    const newBalance = Number(wallet?.balance_cents ?? 0) + amountCents;
+    await supabaseService.from('buyer_wallets').update({ balance_cents: newBalance }).eq('buyer_id', buyerId);
+  }
 }
 
 async function markOrderPaidAndNotify(orderId: string, paymentIntent: any): Promise<void> {

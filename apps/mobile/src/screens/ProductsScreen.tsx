@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   Text,
   TextInput,
@@ -95,6 +96,7 @@ export default function ProductsScreen() {
   const { channel } = useBuyer();
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [sellersById, setSellersById] = useState<Record<string, Seller>>({});
 
@@ -310,6 +312,17 @@ export default function ProductsScreen() {
         data={filtered}
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ paddingHorizontal: spacing['4'], paddingBottom: 140, gap: spacing['3'] }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+            tintColor={colors.brand.primary}
+          />
+        }
         renderItem={({ item }) => (
           <ProductRow
             p={item}

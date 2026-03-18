@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, Switch, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../supabaseClient';
 import Badge from '../../components/Badge';
@@ -110,7 +110,11 @@ export default function SupplierProductDetailScreen() {
     ]);
   }
 
-  if (!product) return null;
+  if (!product) return (
+    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background.app }}>
+      <ActivityIndicator size="large" color={colors.brand.primary} />
+    </SafeAreaView>
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>

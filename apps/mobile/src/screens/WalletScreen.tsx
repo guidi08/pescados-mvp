@@ -1,11 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, RefreshControl, SafeAreaView, ScrollView, Text, View } from 'react-native';
-import { useStripe } from '@stripe/stripe-react-native';
+import { isStripeAvailable } from '../../App';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { colors, spacing, textStyle } from '../theme';
 import { createWalletTopupPaymentSheet, createWalletTopupPix, getWalletMe } from '../api';
 import { centsToBRL } from '../utils';
+
+// Conditionally import useStripe — only works with native module present
+const useStripe = isStripeAvailable
+  ? require('@stripe/stripe-react-native').useStripe
+  : () => ({ initPaymentSheet: async () => ({ error: { message: 'Stripe indispon\u00edvel no Expo Go. Use um dev client build.' } }), presentPaymentSheet: async () => ({ error: { message: 'Stripe indispon\u00edvel' } }) });
+
+const TRANSACTION_KIND_LABELS: Record<string, string> = {
+  weight_adjustment: 'Ajuste de peso',
+  topup: 'Recarga',
+  manual_adjustment: 'Ajuste manual',
+  refund: 'Reembolso',
+};
 
 export default function WalletScreen({ navigation }: any) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
@@ -136,7 +148,7 @@ export default function WalletScreen({ navigation }: any) {
             <View style={{ gap: spacing['2'], marginTop: spacing['2'] }}>
               {transactions.slice(0, 10).map((t) => (
                 <View key={t.id} style={{ borderBottomWidth: 1, borderBottomColor: colors.border.subtle, paddingBottom: spacing['2'] }}>
-                  <Text style={textStyle('bodyStrong')}>{t.kind}</Text>
+                  <Text style={textStyle('bodyStrong')}>{TRANSACTION_KIND_LABELS[t.kind] ?? t.kind}</Text>
                   <Text style={[textStyle('small'), { color: colors.text.secondary }]}>
                     {t.note ?? ''}
                   </Text>

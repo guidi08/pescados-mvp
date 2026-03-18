@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../../App';
@@ -33,6 +33,7 @@ export default function SellerScreen({ route, navigation }: Props) {
   const { sellerId, sellerName } = route.params;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { sellerId: cartSellerId } = useCart();
 
   async function load() {
@@ -93,9 +94,20 @@ export default function SellerScreen({ route, navigation }: Props) {
       </View>
 
       <FlatList
-        data={products}
+        data={products.filter((p) => p.active)}
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ padding: spacing['4'], gap: spacing['3'], paddingBottom: 120 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+            tintColor={colors.brand.primary}
+          />
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             disabled={!item.active}

@@ -193,13 +193,12 @@ export default function CheckoutScreen({ navigation }: any) {
       const result = await createManualPixPayment(order.orderId);
 
       // Navigate to Pix screen with manual PIX data
+      // Do NOT clear cart here — cart is cleared in PixScreen when payment is confirmed
       navigation.navigate('Pix', {
         orderId: order.orderId,
         pix: { data: result.pixCode },
         total: result.total,
       });
-      // Clear after navigating so user can't double-submit
-      clear();
     } catch (e: any) {
       Alert.alert('Erro', e.message ?? 'Falha no Pix');
     } finally {

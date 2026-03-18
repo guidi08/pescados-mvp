@@ -4,6 +4,7 @@ import {
   FlatList,
   Pressable,
   SafeAreaView,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -176,8 +177,11 @@ export default function CartScreen() {
 
           <Pressable
             onPress={() => {
-              // Voltar para fornecedor (se existir) ou para lista
-              navigation.goBack();
+              if (sellerId) {
+                navigation.navigate('Seller', { sellerId, sellerName: sellerName ?? 'Fornecedor' });
+              } else {
+                navigation.navigate('MainTabs', { screen: 'ProductsTab' });
+              }
             }}
           >
             <Text style={[textStyle('bodyStrong'), { color: colors.brand.primary }]}>Adicionar mais itens</Text>
@@ -189,14 +193,13 @@ export default function CartScreen() {
       {suggestions.length ? (
         <View style={{ marginTop: spacing['4'] }}>
           <Text style={textStyle('h2')}>Precisa de mais alguma coisa?</Text>
-          <FlatList
+          <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={suggestions}
-            keyExtractor={(p) => p.id}
             contentContainerStyle={{ gap: spacing['3'], paddingVertical: spacing['3'] }}
-            renderItem={({ item }) => (
-              <Card style={{ width: 180, padding: spacing['3'] }}>
+          >
+            {suggestions.map((item) => (
+              <Card key={item.id} style={{ width: 180, padding: spacing['3'] }}>
                 <Text style={textStyle('bodyStrong')} numberOfLines={2}>{item.name}</Text>
                 <Text style={[textStyle('caption'), { color: colors.text.secondary, marginTop: 6 }]}
                 >
@@ -231,8 +234,8 @@ export default function CartScreen() {
                   <Text style={[textStyle('caption'), { color: colors.text.inverse }]}>Adicionar</Text>
                 </Pressable>
               </Card>
-            )}
-          />
+            ))}
+          </ScrollView>
         </View>
       ) : null}
 
@@ -327,7 +330,20 @@ export default function CartScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing['3'] }}>
                     <QtyStepper
                       value={item.quantity}
-                      onChange={(next) => updateQuantity(item.productId, item.variantId ?? null, next)}
+                      onChange={(next) => {
+                        if (next === 0) {
+                          Alert.alert(
+                            'Remover item?',
+                            `Deseja remover "${item.productName}" da sacola?`,
+                            [
+                              { text: 'Cancelar', style: 'cancel' },
+                              { text: 'Remover', style: 'destructive', onPress: () => updateQuantity(item.productId, item.variantId ?? null, 0) },
+                            ]
+                          );
+                        } else {
+                          updateQuantity(item.productId, item.variantId ?? null, next);
+                        }
+                      }}
                     />
 
                     <Text style={textStyle('bodyStrong')}>{centsToBRL(lineTotalCents(item))}</Text>

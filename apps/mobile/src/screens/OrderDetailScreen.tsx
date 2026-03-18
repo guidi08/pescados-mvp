@@ -103,28 +103,40 @@ export default function OrderDetailScreen() {
   function reorder() {
     if (!order) return;
 
-    clear();
-    for (const it of order.order_items ?? []) {
-      const estimatedBoxWeightKg =
-        it.pricing_mode_snapshot === 'per_kg_box' && it.estimated_total_weight_kg_snapshot && it.quantity
-          ? Number(it.estimated_total_weight_kg_snapshot) / Number(it.quantity)
-          : null;
+    Alert.alert(
+      'Repetir pedido',
+      'Os pre\u00e7os usados ser\u00e3o os do pedido original e podem estar desatualizados. Confira no carrinho antes de finalizar.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Adicionar \u00e0 sacola',
+          onPress: () => {
+            clear();
+            for (const it of order.order_items ?? []) {
+              const estimatedBoxWeightKg =
+                it.pricing_mode_snapshot === 'per_kg_box' && it.estimated_total_weight_kg_snapshot && it.quantity
+                  ? Number(it.estimated_total_weight_kg_snapshot) / Number(it.quantity)
+                  : null;
 
-      addItem(order.seller_id, sellerName, {
-        productId: it.product_id,
-        variantId: it.variant_id,
-        productName: it.product_name_snapshot,
-        variantName: it.variant_name_snapshot,
-        unit: it.unit_snapshot,
-        pricingMode: it.pricing_mode_snapshot,
-        unitPriceCents: it.unit_price_cents_snapshot,
-        quantity: Number(it.quantity ?? 1),
-        estimatedBoxWeightKg,
-        maxWeightVariationPct: 10,
-      });
-    }
+              addItem(order.seller_id, sellerName, {
+                productId: it.product_id,
+                variantId: it.variant_id,
+                productName: it.product_name_snapshot,
+                variantName: it.variant_name_snapshot,
+                unit: it.unit_snapshot,
+                pricingMode: it.pricing_mode_snapshot,
+                unitPriceCents: it.unit_price_cents_snapshot,
+                quantity: Number(it.quantity ?? 1),
+                estimatedBoxWeightKg,
+                maxWeightVariationPct: 10,
+              });
+            }
 
-    navigation.navigate('Cart');
+            navigation.navigate('Cart');
+          },
+        },
+      ]
+    );
   }
 
   async function attemptCancel() {

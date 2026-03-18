@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   DimensionValue,
   Dimensions,
   FlatList,
   Image,
   Pressable,
+  RefreshControl,
   SafeAreaView,
+  ScrollView,
   Text,
   View,
 } from 'react-native';
@@ -327,8 +330,21 @@ export default function HomeScreen() {
     [navigation]
   );
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
+  const flatListRef = useRef<FlatList>(null);
+
   function openCategory(tile: (typeof CATEGORY_TILES)[number]) {
-    if (!tile.category && !tile.freshFilter) return;
+    if (!tile.category && !tile.freshFilter) {
+      Alert.alert('Em breve!', 'Esta categoria ainda n\u00e3o est\u00e1 dispon\u00edvel.');
+      return;
+    }
     navigation.navigate('ProductsTab', {
       initialCategory: tile.category ?? 'Todos',
       initialFreshFilter: tile.freshFilter ?? 'all',
@@ -347,20 +363,15 @@ export default function HomeScreen() {
         {/* Location (centered like iFood) */}
         <View style={{ height: 44, justifyContent: 'center' }}>
           <View style={{ alignItems: 'center' }}>
-            <Pressable
-              onPress={() => {
-                // MVP: localização fixa
-              }}
-              style={({ pressed }) => ({
+            <View
+              style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
-                opacity: pressed ? 0.75 : 1,
-              })}
+              }}
             >
-              <Text style={textStyle('bodyStrong')}>São Paulo</Text>
-              <Ionicons name="chevron-down" size={16} color={colors.text.secondary} />
-            </Pressable>
+              <Text style={textStyle('bodyStrong')}>S\u00e3o Paulo</Text>
+            </View>
             <Text style={[textStyle('caption'), { color: colors.text.tertiary, marginTop: 2 }]}>
               Capital • Entrega D+1 (conforme cut-off)
             </Text>
@@ -368,7 +379,7 @@ export default function HomeScreen() {
 
           <Pressable
             onPress={() => {
-              // MVP: notificações em breve
+              Alert.alert('Notifica\u00e7\u00f5es em breve!', 'Este recurso ser\u00e1 lan\u00e7ado em uma pr\u00f3xima atualiza\u00e7\u00e3o.');
             }}
             hitSlop={10}
             style={({ pressed }) => ({
@@ -569,7 +580,8 @@ export default function HomeScreen() {
           <Text style={textStyle('h2')}>Últimas lojas</Text>
           <Pressable
             onPress={() => {
-              // MVP: já mostramos a lista completa abaixo
+              // Scroll down to the full supplier list
+              flatListRef.current?.scrollToEnd({ animated: true });
             }}
           >
             <Text style={[textStyle('body'), { color: colors.brand.primary }]}>Ver mais</Text>
@@ -585,19 +597,19 @@ export default function HomeScreen() {
             <Skeleton w={116} h={132} r={16} />
           </View>
         ) : (
-          <FlatList
+          <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={latestSellers}
-            keyExtractor={(s) => s.id}
             contentContainerStyle={{ paddingHorizontal: spacing['4'], gap: spacing['3'] }}
-            renderItem={({ item }) => (
+          >
+            {latestSellers.map((item) => (
               <SellerMiniCard
+                key={item.id}
                 s={item}
                 onPress={() => navigation.navigate('Seller', { sellerId: item.id, sellerName: item.display_name })}
               />
-            )}
-          />
+            ))}
+          </ScrollView>
         )}
 
         {channel === 'b2c' ? (
@@ -649,10 +661,18 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.app }}>
       <FlatList
+        ref={flatListRef}
         data={loading ? [] : sellers}
         keyExtractor={(s) => s.id}
         contentContainerStyle={{ paddingBottom: 160, gap: spacing['3'] }}
         ListHeaderComponent={Header}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.brand.primary}
+          />
+        }
         renderItem={({ item }) => (
           <View style={{ paddingHorizontal: spacing['4'] }}>
             <SellerRow
@@ -662,9 +682,26 @@ export default function HomeScreen() {
           </View>
         )}
         ListEmptyComponent={!loading ? (
-          <Text style={{ paddingHorizontal: spacing['4'], paddingVertical: spacing['5'], color: colors.text.secondary }}>
-            Nenhum fornecedor disponível.
-          </Text>
+          loadError ? (
+            <View style={{ paddingHorizontal: spacing['4'], paddingVertical: spacing['5'], alignItems: 'center', gap: spacing['3'] }}>
+              <Text style={{ color: colors.semantic.error }}>{loadError}</Text>
+              <Pressable
+                onPress={load}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  backgroundColor: colors.brand.primary,
+                }}
+              >
+                <Text style={{ color: colors.text.inverse, fontWeight: '600' }}>Tentar novamente</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={{ paddingHorizontal: spacing['4'], paddingVertical: spacing['5'], color: colors.text.secondary }}>
+              Nenhum fornecedor dispon\u00edvel.
+            </Text>
+          )
         ) : null}
       />
     </SafeAreaView>
